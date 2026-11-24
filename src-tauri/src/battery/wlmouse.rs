@@ -10,11 +10,13 @@
 //!   CC = 1 while charging, NN = battery percent
 //! ```
 //! The receiver relays the query to the mouse; a sleeping mouse never answers, so `A0` persists.
+//! With the charging cable attached, the mouse enumerates as its own USB device (36A7:A861) and
+//! answers the same query directly with CC = 1, while the receiver reports A0 (verified).
 //! Other WLmouse receivers on VID 36A7 use the same query according to the hub code and
 //! community tools, but only A860 has been tested.
 use super::{
     hex,
-    provider::{clean_product, Found, Outcome, Poll, Provider},
+    provider::{clean_product, signature_of, Found, Outcome, Poll, Provider},
     DeviceKind,
 };
 use hidapi::{HidApi, HidDevice};
@@ -100,6 +102,12 @@ impl WlMouse {
     }
 }
 
+/// The receiver names itself "... RECEIVER"; the mouse on a USB cable (36A7:A861 for the Beast G)
+/// does not. Fall back to the known receiver PID when the product string is unavailable.
+fn is_receiver(d: &hidapi::DeviceInfo) -> bool {
+    d.product_string().map_or(d.product_id() == 0xA860, |s| s.to_ascii_uppercase().contains("RECEIVER"))
+}
+
 impl Provider for WlMouse {
     fn id(&self) -> &'static str {
         ID
@@ -118,10 +126,13 @@ impl Provider for WlMouse {
         self.last_path = None;
     }
 
-    fn is_present(&self, api: &HidApi) -> bool {
-        api.device_list().any(|d| self.matches(d.vendor_id(), d.product_id()) && d.usage_page() == VENDOR_PAGE)
+    fn signature(&self, api: &HidApi) -> String {
+        signature_of(api, |d| self.matches(d.vendor_id(), d.product_id()) && d.usage_page() == VENDOR_PAGE)
     }
 
+    /// Asks every matching collection. With the charging cable attached the mouse appears as its
+    /// own USB device and answers directly (with the charging flag set), while the receiver only
+    /// reports "waiting" — so a real reading from any collection wins over "asleep".
     fn poll(&mut self, api: &HidApi) -> Poll {
         let mut candidates: Vec<_> = api
             .device_list()
@@ -130,16 +141,21 @@ impl Provider for WlMouse {
         if candidates.is_empty() {
             return Poll::not_found();
         }
-        // Known-good collection first, then usage 0 (the one that accepts the query on A860).
-        candidates.sort_by_key(|d| (Some(d.path()) != self.last_path.as_deref(), d.usage() != 0));
-        let first = candidates[0];
-        let found = Found {
-            product: clean_product(first.product_string().unwrap_or("WLmouse")),
-            hardware: format!("{:04X}:{:04X}", first.vendor_id(), first.product_id()),
+        // Cable-connected mouse first, then the collection that answered last time, then usage 0.
+        candidates.sort_by_key(|d| (is_receiver(d), Some(d.path()) != self.last_path.as_deref(), d.usage() != 0));
+        let found_for = |d: &hidapi::DeviceInfo| Found {
+            product: clean_product(d.product_string().unwrap_or("WLmouse")),
+            hardware: format!("{:04X}:{:04X}", d.vendor_id(), d.product_id()),
             source: "HID feature report 0, vendor page FFFF, command 0x83".into(),
+            connection: (!is_receiver(d)).then_some("USB cable"),
         };
         let mut errors = Vec::new();
-        for info in candidates {
+        let mut pending: Option<Found> = None;
+        for info in &candidates {
+            // A sleeping mouse cannot answer on the cable path either; skip receivers once one is pending.
+            if pending.is_some() && is_receiver(info) {
+                continue;
+            }
             let dev = match info.open_device(api) {
                 Ok(d) => d,
                 Err(e) => {
@@ -150,19 +166,22 @@ impl Provider for WlMouse {
             match Self::query(&dev) {
                 Ok(Reply::Battery { percent, charging }) => {
                     self.last_path = Some(info.path().to_owned());
-                    return Poll { found: Some(found), outcome: Outcome::Battery { percent, charging, millivolts: None } };
+                    return Poll { found: Some(found_for(info)), outcome: Outcome::Battery { percent, charging, millivolts: None } };
                 }
                 Ok(Reply::Pending) => {
-                    self.last_path = Some(info.path().to_owned());
-                    return Poll { found: Some(found), outcome: Outcome::Asleep };
+                    pending.get_or_insert_with(|| found_for(info));
                 }
                 Ok(Reply::Foreign) => errors.push("unexpected reply".into()),
                 Err(e) => errors.push(e),
             }
         }
-        Poll { found: Some(found), outcome: Outcome::Failed(errors.join("; ")) }
+        match pending {
+            Some(found) => Poll { found: Some(found), outcome: Outcome::Asleep },
+            None => Poll { found: Some(found_for(candidates[0])), outcome: Outcome::Failed(errors.join("; ")) },
+        }
     }
 }
+
 
 #[cfg(test)]
 mod tests {

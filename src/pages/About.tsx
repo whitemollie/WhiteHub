@@ -10,7 +10,7 @@ export function About() {
         </div>
         <div>
           <h1>WhiteHub</h1>
-          <p class="muted">Version {state.app?.version}</p>
+          <p class="muted">Version {state.app?.version} · by whitemollie</p>
         </div>
       </div>
       <p class="about-text">
@@ -18,6 +18,8 @@ export function About() {
         locally: no accounts, no telemetry, no network requests, and it never modifies vendor software.
       </p>
       <dl class="info-grid about-grid">
+        <dt>Author</dt>
+        <dd>whitemollie</dd>
         <dt>Supported</dt>
         <dd>WLmouse Beast G (2.4 GHz receiver 36A7:A860) · HyperX Cloud III S Wireless (dongle 03F0:06BE)</dd>
         <dt>Method</dt>

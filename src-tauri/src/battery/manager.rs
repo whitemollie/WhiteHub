@@ -5,7 +5,7 @@
 //! panics only affects its own snapshot.
 use super::{
     now_ms,
-    provider::{Outcome, Poll, Provider},
+    provider::{EventSource, Outcome, Poll, Provider},
     DeviceSnapshot, Status,
 };
 use crate::settings::{DeviceSettings, Settings};
@@ -37,6 +37,10 @@ pub enum Cmd {
     /// System resumed from sleep/hibernation.
     Resumed,
     Configure(Box<Settings>),
+    /// Poll one device after a short delay (pushed device event).
+    RefreshIn(&'static str, Duration),
+    /// A device event listener stopped (device unplugged).
+    ListenerEnded(&'static str),
     Shutdown,
 }
 
@@ -62,10 +66,11 @@ impl Manager {
         let snapshots = Arc::new(Mutex::new(slots.iter().map(|s| s.snap.clone()).collect()));
         let (tx, rx) = channel();
         let shared = snapshots.clone();
+        let worker_tx = tx.clone();
         let thread = std::thread::Builder::new()
             .name("battery-manager".into())
             .spawn(move || {
-                let mut w = Worker { slots, interval, api: None, rescan_at: None, publish, shared };
+                let mut w = Worker { slots, interval, api: None, rescan_at: None, publish, shared, tx: worker_tx };
                 loop {
                     let now = Instant::now();
                     let wake = w.slots.iter().filter_map(|s| s.next_due).chain(w.rescan_at).min();
@@ -123,6 +128,10 @@ struct Slot {
     failures: u32,
     linked: Option<bool>,
     low_alerted: bool,
+    /// Matching USB devices at the last check (see `Provider::signature`).
+    signature: String,
+    /// A device event listener thread is running.
+    listening: bool,
 }
 
 impl Slot {
@@ -147,7 +156,7 @@ impl Slot {
             enabled: cfg.enabled,
         };
         let next_due = cfg.enabled.then(Instant::now);
-        Self { provider, cfg, snap, next_due, last_poll: None, failures: 0, linked: None, low_alerted: false }
+        Self { provider, cfg, snap, next_due, last_poll: None, failures: 0, linked: None, low_alerted: false, signature: String::new(), listening: false }
     }
 
     /// Folds a poll result into the snapshot; returns notification events and the next delay.
@@ -159,6 +168,7 @@ impl Slot {
             s.hardware = Some(f.hardware.clone());
             s.product = Some(f.product.clone());
             s.source = f.source.clone();
+            s.connection = f.connection.unwrap_or_else(|| self.provider.connection());
         }
         let delay = match &poll.outcome {
             Outcome::Battery { percent, charging, millivolts } => {
@@ -173,6 +183,7 @@ impl Slot {
             }
             Outcome::NotFound => {
                 s.status = Status::Disconnected;
+                s.connection = self.provider.connection();
                 s.charging = false;
                 s.hardware = None;
                 s.error = None;
@@ -269,6 +280,38 @@ struct Worker {
     rescan_at: Option<Instant>,
     publish: Publish,
     shared: Arc<Mutex<Vec<DeviceSnapshot>>>,
+    tx: Sender<Cmd>,
+}
+
+/// Delay between a pushed event and the poll, so the device has settled (e.g. charge state).
+const EVENT_SETTLE: Duration = Duration::from_millis(1500);
+
+/// Blocks on the device's input reports (no CPU while idle) and asks for a poll when the device
+/// reports a change. Ends when the device goes away. Returns whether the thread started.
+fn spawn_listener(id: &'static str, src: EventSource, tx: Sender<Cmd>) -> bool {
+    std::thread::Builder::new()
+        .name(format!("{id}-events"))
+        .spawn(move || {
+            log::info!("[{id}] listening for device events");
+            let mut buf = [0u8; 64];
+            loop {
+                match src.device.read_timeout(&mut buf, -1) {
+                    Ok(n) if n > 0 && (src.is_change)(&buf[..n]) => {
+                        log::info!("[{id}] device event {}", super::hex(&buf[..n.min(6)]));
+                        if tx.send(Cmd::RefreshIn(id, EVENT_SETTLE)).is_err() {
+                            break;
+                        }
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        log::info!("[{id}] event listener stopped: {e}");
+                        break;
+                    }
+                }
+            }
+            let _ = tx.send(Cmd::ListenerEnded(id));
+        })
+        .is_ok()
 }
 
 impl Worker {
@@ -303,6 +346,17 @@ impl Worker {
                 }
                 self.publish(Vec::new());
             }
+            Cmd::RefreshIn(id, delay) => {
+                if let Some(s) = self.slots.iter_mut().find(|s| s.cfg.enabled && s.snap.id == id) {
+                    let at = now + delay;
+                    s.next_due = Some(s.next_due.map_or(at, |d| d.min(at)));
+                }
+            }
+            Cmd::ListenerEnded(id) => {
+                if let Some(s) = self.slots.iter_mut().find(|s| s.snap.id == id) {
+                    s.listening = false;
+                }
+            }
             Cmd::Shutdown => {}
         }
     }
@@ -324,13 +378,14 @@ impl Worker {
             self.rescan_at = None;
             if self.ensure_api().is_ok() {
                 let api = self.api.as_ref().expect("api");
-                let present: Vec<bool> = self.slots.iter().map(|s| s.provider.is_present(api)).collect();
-                for (s, present) in self.slots.iter_mut().zip(present) {
-                    let shown_present = s.snap.status != Status::Disconnected;
-                    if s.cfg.enabled && (present != shown_present || s.snap.status == Status::Unknown) {
-                        log::info!("[{}] receiver {}", s.snap.id, if present { "plugged in" } else { "removed" });
+                let sigs: Vec<String> = self.slots.iter().map(|s| s.provider.signature(api)).collect();
+                for (s, sig) in self.slots.iter_mut().zip(sigs) {
+                    // Receiver plugged/removed, or the mouse appeared on its charging cable.
+                    if s.cfg.enabled && (sig != s.signature || s.snap.status == Status::Unknown) {
+                        log::info!("[{}] USB devices changed: [{}] -> [{}]", s.snap.id, s.signature, sig);
                         s.next_due = Some(now);
                     }
+                    s.signature = sig;
                 }
             }
         }
@@ -354,7 +409,13 @@ impl Worker {
                     let (ev, delay) = slot.apply(poll, now_ms(), interval);
                     slot.last_poll = Some(Instant::now());
                     slot.next_due = Some(Instant::now() + delay);
+                    slot.signature = slot.provider.signature(api);
                     events.extend(ev);
+                    if !slot.listening && matches!(slot.snap.status, Status::Online | Status::Off) {
+                        if let Some(src) = slot.provider.event_source(api) {
+                            slot.listening = spawn_listener(slot.snap.id, src, self.tx.clone());
+                        }
+                    }
                 }
             }
             Err(e) => {
@@ -399,8 +460,8 @@ mod tests {
             "test"
         }
         fn set_product_filter(&mut self, _: Option<u16>) {}
-        fn is_present(&self, _: &HidApi) -> bool {
-            true
+        fn signature(&self, _: &HidApi) -> String {
+            String::new()
         }
         fn poll(&mut self, _: &HidApi) -> Poll {
             unreachable!("not used by slot tests")
@@ -413,7 +474,7 @@ mod tests {
         Slot::new(Box::new(Fake), &Settings::default())
     }
     fn found() -> Option<Found> {
-        Some(Found { product: "X".into(), hardware: "36A7:A860".into(), source: "test".into() })
+        Some(Found { product: "X".into(), hardware: "36A7:A860".into(), source: "test".into(), connection: None })
     }
     fn battery(p: u8, charging: bool) -> Poll {
         Poll { found: found(), outcome: Outcome::Battery { percent: p, charging, millivolts: None } }
