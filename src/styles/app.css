@@ -287,8 +287,10 @@ h2 {
   color: var(--muted);
 }
 .charging {
-  color: var(--high);
+  color: var(--text);
   display: inline-flex;
+  align-self: center;
+  transform: translateY(-2px);
 }
 .battery-bar {
   height: 4px;

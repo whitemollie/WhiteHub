@@ -13,7 +13,59 @@ use windows_sys::Win32::{
 pub const GLYPH_MOUSE: char = '\u{E962}';
 pub const GLYPH_HEADPHONE: char = '\u{E7F6}';
 pub const GLYPH_HEADSET: char = '\u{E95B}';
-const GLYPH_BOLT: char = '\u{E945}';
+/// Filled charging bolt (iOS-style): outline in a unit box, width/height = BOLT_ASPECT.
+const BOLT: [(f32, f32); 6] = [(0.68, 0.0), (0.03, 0.60), (0.47, 0.60), (0.32, 1.0), (0.97, 0.40), (0.53, 0.40)];
+const BOLT_ASPECT: f32 = 0.64;
+/// Corner radius relative to the bolt height.
+const BOLT_ROUND: f32 = 0.07;
+
+/// Replaces every corner of a closed polygon with a circular fillet of radius `r`.
+fn rounded(points: &[(f32, f32)], r: f32) -> Vec<(f32, f32)> {
+    let n = points.len();
+    let mut out = Vec::with_capacity(n * 8);
+    for i in 0..n {
+        let (a, v, b) = (points[(i + n - 1) % n], points[i], points[(i + 1) % n]);
+        let (la, lb) = (((a.0 - v.0).powi(2) + (a.1 - v.1).powi(2)).sqrt(), ((b.0 - v.0).powi(2) + (b.1 - v.1).powi(2)).sqrt());
+        let d1 = ((a.0 - v.0) / la, (a.1 - v.1) / la);
+        let d2 = ((b.0 - v.0) / lb, (b.1 - v.1) / lb);
+        let theta = (d1.0 * d2.0 + d1.1 * d2.1).clamp(-1.0, 1.0).acos();
+        if theta < 1e-3 || (std::f32::consts::PI - theta) < 1e-3 {
+            out.push(v);
+            continue;
+        }
+        // Tangent length, limited so neighbouring fillets never overlap.
+        let t = (r / (theta / 2.0).tan()).min(la.min(lb) * 0.45);
+        let rr = t * (theta / 2.0).tan();
+        let p1 = (v.0 + d1.0 * t, v.1 + d1.1 * t);
+        let p2 = (v.0 + d2.0 * t, v.1 + d2.1 * t);
+        let bis = (d1.0 + d2.0, d1.1 + d2.1);
+        let bl = (bis.0 * bis.0 + bis.1 * bis.1).sqrt();
+        let dist = rr / (theta / 2.0).sin();
+        let centre = (v.0 + bis.0 / bl * dist, v.1 + bis.1 / bl * dist);
+        let (s, mut e) = ((p1.1 - centre.1).atan2(p1.0 - centre.0), (p2.1 - centre.1).atan2(p2.0 - centre.0));
+        // Take the short way round.
+        while e - s > std::f32::consts::PI {
+            e -= 2.0 * std::f32::consts::PI;
+        }
+        while s - e > std::f32::consts::PI {
+            e += 2.0 * std::f32::consts::PI;
+        }
+        for k in 0..=6 {
+            let ang = s + (e - s) * k as f32 / 6.0;
+            out.push((centre.0 + rr * ang.cos(), centre.1 + rr * ang.sin()));
+        }
+    }
+    out
+}
+
+/// Draws the filled bolt with its left edge at `x`, vertically centred on `cy`; returns the right edge.
+fn draw_bolt(c: &mut Canvas, x: f32, cy: f32, h: f32, rgb: [u8; 3], alpha: f32) -> f32 {
+    let w = h * BOLT_ASPECT;
+    let y = cy - h / 2.0;
+    let pts: Vec<(f32, f32)> = BOLT.iter().map(|&(px, py)| (x + px * w, y + py * h)).collect();
+    c.polygon(&rounded(&pts, h * BOLT_ROUND), rgb, alpha);
+    x + w
+}
 
 pub struct Fonts {
     text: FontRef<'static>,
@@ -89,6 +141,42 @@ impl Canvas {
         }
     }
 
+    /// Fills a polygon (even-odd) with 4×4 supersampled anti-aliasing.
+    pub fn polygon(&mut self, pts: &[(f32, f32)], rgb: [u8; 3], alpha: f32) {
+        if pts.len() < 3 {
+            return;
+        }
+        let inside = |x: f32, y: f32| {
+            let mut inside = false;
+            let mut j = pts.len() - 1;
+            for i in 0..pts.len() {
+                let ((xi, yi), (xj, yj)) = (pts[i], pts[j]);
+                if (yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi {
+                    inside = !inside;
+                }
+                j = i;
+            }
+            inside
+        };
+        let (x0, x1) = pts.iter().fold((f32::MAX, f32::MIN), |(a, b), p| (a.min(p.0), b.max(p.0)));
+        let (y0, y1) = pts.iter().fold((f32::MAX, f32::MIN), |(a, b), p| (a.min(p.1), b.max(p.1)));
+        for py in (y0.floor() as i32)..=(y1.ceil() as i32) {
+            for px in (x0.floor() as i32)..=(x1.ceil() as i32) {
+                let mut hits = 0;
+                for sy in 0..4 {
+                    for sx in 0..4 {
+                        if inside(px as f32 + (sx as f32 + 0.5) / 4.0, py as f32 + (sy as f32 + 0.5) / 4.0) {
+                            hits += 1;
+                        }
+                    }
+                }
+                if hits > 0 {
+                    self.blend(px, py, hits as f32 / 16.0, rgb, alpha);
+                }
+            }
+        }
+    }
+
     /// Draws `s` with its baseline at `base`; returns the pen position after the last glyph.
     pub fn text(&mut self, font: &FontRef, size: f32, s: &str, mut x: f32, base: f32, rgb: [u8; 3], alpha: f32) -> f32 {
         let scale = PxScale::from(size);
@@ -160,12 +248,14 @@ pub struct RenderedStrip {
 pub fn render_strip(items: &[StripItem], height: u32, scale: f32, fg: [u8; 3]) -> Option<RenderedStrip> {
     let f = fonts()?;
     let size = 15.0 * scale;
-    let (gap_icon, gap_item, pad, bolt) = (5.0 * scale, 16.0 * scale, 8.0 * scale, 11.0 * scale);
+    let (gap_icon, gap_item, pad) = (5.0 * scale, 16.0 * scale, 8.0 * scale);
+    let (bolt_h, bolt_gap) = (14.0 * scale, 3.5 * scale);
+    let bolt = bolt_h * BOLT_ASPECT;
     let icon_w = |it: &StripItem| match (it.glyph, &f.icons) {
         (Some(g), Some(icons)) => measure(icons, size, &g.to_string()) + 0.7 * scale,
         _ => measure(&f.text, size, &it.label),
     };
-    let item_w = |it: &StripItem| icon_w(it) + gap_icon + measure(&f.text, size, &it.text) + if it.charging { bolt + 2.0 * scale } else { 0.0 };
+    let item_w = |it: &StripItem| icon_w(it) + gap_icon + measure(&f.text, size, &it.text) + if it.charging { bolt + bolt_gap } else { 0.0 };
     let width = pad * 2.0 + items.iter().map(item_w).sum::<f32>() + gap_item * items.len().saturating_sub(1) as f32;
     let w = width.ceil().max(1.0) as u32;
     let mut c = Canvas::new(w, height);
@@ -192,10 +282,7 @@ pub fn render_strip(items: &[StripItem], height: u32, scale: f32, fg: [u8; 3]) -
         }
         x = c.text(&f.text, size, &it.text, x + gap_icon, base, color, alpha);
         if it.charging {
-            if let Some(icons) = &f.icons {
-                let ib = (height as f32 + icons.as_scaled(PxScale::from(bolt)).ascent() * 0.80) / 2.0;
-                x = c.text(icons, bolt, &GLYPH_BOLT.to_string(), x + 2.0 * scale, ib, color, alpha);
-            }
+            x = draw_bolt(&mut c, x + bolt_gap, height as f32 / 2.0, bolt_h, fg, alpha);
         }
         regions.push((start as i32 - (gap_item / 2.0) as i32, (x + gap_item / 2.0) as i32));
     }
@@ -266,6 +353,44 @@ mod tests {
         assert_eq!(r.regions.len(), 2);
         assert!(r.regions[0].1 <= r.regions[1].0 + 1);
         assert!(r.bgra.chunks(4).any(|p| p[3] > 200), "text pixels are drawn");
+    }
+
+    #[test]
+    fn bolt_is_filled_and_rounded() {
+        let mut c = Canvas::new(20, 30);
+        let right = draw_bolt(&mut c, 2.0, 15.0, 24.0, [255, 255, 255], 1.0);
+        assert!((right - (2.0 + 24.0 * BOLT_ASPECT)).abs() < 0.01);
+        let solid = c.px.iter().filter(|p| p[3] > 0.99).count();
+        assert!(solid > 40, "bolt interior is filled, got {solid} solid pixels");
+        assert_eq!(rounded(&BOLT, 0.05).len(), BOLT.len() * 7);
+    }
+
+    /// Writes a preview of the strip on a dark taskbar colour: `WHITEHUB_PREVIEW=out.bmp cargo test preview -- --ignored`.
+    #[test]
+    #[ignore]
+    fn preview() {
+        let Ok(path) = std::env::var("WHITEHUB_PREVIEW") else { return };
+        let items = [
+            StripItem { glyph: Some(GLYPH_MOUSE), label: "M".into(), text: "47%".into(), color: None, dim: false, charging: true, tooltip: String::new() },
+            StripItem { glyph: Some(GLYPH_HEADPHONE), label: "H".into(), text: "45%".into(), color: None, dim: false, charging: true, tooltip: String::new() },
+        ];
+        let r = render_strip(&items, 72, 1.5, [255, 255, 255]).unwrap();
+        let mut bmp = Vec::new();
+        let size = 54 + r.w * r.h * 4;
+        bmp.extend_from_slice(b"BM");
+        bmp.extend_from_slice(&size.to_le_bytes());
+        bmp.extend_from_slice(&[0, 0, 0, 0, 54, 0, 0, 0, 40, 0, 0, 0]);
+        bmp.extend_from_slice(&(r.w as i32).to_le_bytes());
+        bmp.extend_from_slice(&(-(r.h as i32)).to_le_bytes());
+        bmp.extend_from_slice(&[1, 0, 32, 0, 0, 0, 0, 0]);
+        bmp.extend_from_slice(&[0u8; 20]);
+        for p in r.bgra.chunks(4) {
+            // Composite over the Windows 11 dark taskbar colour (#1C1C1C).
+            let a = f32::from(p[3]) / 255.0;
+            let mix = |c: u8| (f32::from(c) + 28.0 * (1.0 - a)).round() as u8;
+            bmp.extend_from_slice(&[mix(p[0]), mix(p[1]), mix(p[2]), 255]);
+        }
+        std::fs::write(path, bmp).unwrap();
     }
 
     #[test]

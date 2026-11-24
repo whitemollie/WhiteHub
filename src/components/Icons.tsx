@@ -97,10 +97,17 @@ export const CloseIcon = (p: P) => (
   </Svg>
 );
 
+/** Filled, softly rounded charging bolt — same outline as the taskbar strip. */
 export const BoltIcon = (p: P) => (
-  <Svg {...p}>
-    <path d="M13 3 5 14h6l-1 7 8-11h-6z" />
-  </Svg>
+  <svg class={p.class} width={p.size ?? 16} height={p.size ?? 16} viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M14.3 2 5.98 14h5.64L9.7 22l8.32-12h-5.64z"
+      fill="currentColor"
+      stroke="currentColor"
+      stroke-width="1.4"
+      stroke-linejoin="round"
+    />
+  </svg>
 );
 
 export const LogoMark = (p: P) => (
