@@ -14,10 +14,10 @@ pub const GLYPH_MOUSE: char = '\u{E962}';
 pub const GLYPH_HEADPHONE: char = '\u{E7F6}';
 pub const GLYPH_HEADSET: char = '\u{E95B}';
 /// Filled charging bolt (iOS-style): outline in a unit box, width/height = BOLT_ASPECT.
-const BOLT: [(f32, f32); 6] = [(0.68, 0.0), (0.03, 0.60), (0.47, 0.60), (0.32, 1.0), (0.97, 0.40), (0.53, 0.40)];
-const BOLT_ASPECT: f32 = 0.64;
+const BOLT: [(f32, f32); 6] = [(0.72, 0.0), (0.02, 0.58), (0.45, 0.58), (0.28, 1.0), (0.98, 0.42), (0.55, 0.42)];
+const BOLT_ASPECT: f32 = 0.62;
 /// Corner radius relative to the bolt height.
-const BOLT_ROUND: f32 = 0.07;
+const BOLT_ROUND: f32 = 0.012;
 
 /// Replaces every corner of a closed polygon with a circular fillet of radius `r`.
 fn rounded(points: &[(f32, f32)], r: f32) -> Vec<(f32, f32)> {
