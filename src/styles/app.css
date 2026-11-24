@@ -266,8 +266,8 @@ h2 {
 }
 .device-level {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 6px;
   margin: 12px 0 8px;
 }
 .percent {
@@ -286,11 +286,18 @@ h2 {
 .device-card.stale .percent {
   color: var(--muted);
 }
+/* Sized to the digits' cap height and centred on them (the % sign is excluded on purpose). */
 .charging {
   color: var(--text);
   display: inline-flex;
-  align-self: center;
-  transform: translateY(-2px);
+  /* Segoe UI digits at 30px/1 sit ~2px below the line-box centre: shift the 26px icon down. */
+  height: 30px;
+  padding-top: 4px;
+  align-items: center;
+  margin-left: -4px;
+}
+.charging svg {
+  display: block;
 }
 .battery-bar {
   height: 4px;

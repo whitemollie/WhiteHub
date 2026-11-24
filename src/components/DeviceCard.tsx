@@ -59,7 +59,7 @@ export function DeviceCard(props: { device: Device }) {
         </span>
         <Show when={d().charging}>
           <span class="charging" title="Charging">
-            <BoltIcon size={20} />
+            <BoltIcon size={26} />
           </span>
         </Show>
       </div>
