@@ -1,0 +1,21 @@
+{
+  "name": "whitehub",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.12.5",
+    "solid-js": "1.9.20"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.6",
+    "typescript": "5.9.3",
+    "vite": "8.3.8",
+    "vite-plugin-solid": "2.11.17"
+  }
+}
