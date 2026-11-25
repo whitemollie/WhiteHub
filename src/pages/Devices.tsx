@@ -42,7 +42,7 @@ function MissingDevice() {
       <Show when={!state.devices.some((d) => d.id === "wlmouse" && d.known)}>
         <Row
           title="Another WLmouse mouse"
-          hint={'Product ID from the file below: the four characters after "36A7:". Untested. The Beast G battery query is sent to that device.'}
+          hint={'Product ID from the file below: the four characters after "36A7:". Untested. The battery query of the supported model is sent to that device.'}
         >
           <input
             class="input mono narrow"

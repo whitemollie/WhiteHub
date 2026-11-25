@@ -55,7 +55,7 @@ pub enum Status {
     /// Battery read successfully on the last attempt.
     Online,
     /// Receiver present, but the device did not answer because it is sleeping (or switched off;
-    /// the WLmouse receiver cannot tell these apart).
+    /// a receiver often cannot tell these apart).
     Asleep,
     /// Receiver present, device reported or appears to be powered off.
     Off,

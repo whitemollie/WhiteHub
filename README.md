@@ -47,6 +47,8 @@ No vendor apps in the background. No drivers. No network access.
 | **Devices** | **Appearance** |
 | <img src="assets/screenshots/devices.png" width="400" alt="Devices page"> | <img src="assets/screenshots/appearance.png" width="400" alt="Appearance page"> |
 
+<sub>Shown with example devices.</sub>
+
 </div>
 
 ## Quick start
@@ -67,7 +69,7 @@ There is nothing to search for or add: WhiteHub looks by itself, when it starts 
 | Bluetooth | Connect it in Windows. If *Settings → Bluetooth & devices* shows its battery, WhiteHub shows it too |
 | 2.4 GHz dongle of a supported model | Plug in the dongle and switch the device on |
 | 2.4 GHz dongle of another model | Not supported yet: press **Devices → My device is missing → Create file** and [request it](../../issues/new?template=device-request.yml) |
-| Another WLmouse mouse | Enter its product ID under **Devices → My device is missing** (untested) |
+| Another mouse of a supported vendor | Enter its product ID under **Devices → My device is missing** (untested) |
 | Xbox controller | Connect it wirelessly and switch it on |
 
 ## Devices
@@ -140,4 +142,4 @@ Users only need the installer. Building from source and adding devices: [CONTRIB
 
 [GPL-3.0](LICENSE), © 2026 whitemollie. Protocol sources and credits: [CREDITS.md](CREDITS.md).
 
-<sub>WhiteHub is an independent project. It is not affiliated with or endorsed by WLmouse, HyperX or HP.</sub>
+<sub>WhiteHub is an independent project. It is not affiliated with or endorsed by any device manufacturer.</sub>

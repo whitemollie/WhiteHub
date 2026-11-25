@@ -88,7 +88,7 @@ mod tests {
 
     #[test]
     fn product_names_are_cleaned() {
-        assert_eq!(clean_product("WLMOUSE  BEAST G 8K RECEIVER"), "WLMOUSE BEAST G 8K");
+        assert_eq!(clean_product("WIRELESS  MOUSE 8K RECEIVER"), "WIRELESS MOUSE 8K");
         assert_eq!(clean_product("Evil\n2026 INFO fake\u{1b}[0m"), "Evil 2026 INFO fake [0m");
         assert!(clean_product(&"x".repeat(500)).len() <= 80);
     }

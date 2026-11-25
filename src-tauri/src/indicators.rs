@@ -157,8 +157,8 @@ mod tests {
     fn snap(status: Status, percent: Option<u8>) -> DeviceSnapshot {
         DeviceSnapshot {
             id: "wlmouse".into(),
-            name: "WLmouse Beast G".into(),
-            default_name: "WLmouse Beast G".into(),
+            name: "Mouse".into(),
+            default_name: "Mouse".into(),
             known: true,
             discovered: false,
             kind: DeviceKind::Mouse,

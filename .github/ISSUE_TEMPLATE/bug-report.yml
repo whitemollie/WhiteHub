@@ -21,7 +21,7 @@ body:
     id: device
     attributes:
       label: Device
-      placeholder: HyperX Cloud III S Wireless
+      placeholder: Vendor and exact model name
   - type: textarea
     id: report
     attributes:

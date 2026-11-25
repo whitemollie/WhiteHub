@@ -47,6 +47,8 @@
 | **Устройства** | **Оформление** |
 | <img src="assets/screenshots/devices.png" width="400" alt="Страница устройств"> | <img src="assets/screenshots/appearance.png" width="400" alt="Страница оформления"> |
 
+<sub>На снимках примеры устройств.</sub>
+
 </div>
 
 Интерфейс программы на английском.
@@ -69,7 +71,7 @@
 | Bluetooth | Подключите его в Windows. Если заряд виден в *Параметры → Bluetooth и устройства*, его покажет и WhiteHub |
 | Донгл 2.4 GHz поддерживаемой модели | Вставьте донгл и включите устройство |
 | Донгл 2.4 GHz другой модели | Пока не поддерживается: нажмите **Devices → My device is missing → Create file** и [оставьте заявку](../../issues/new?template=device-request.yml) |
-| Другая мышь WLmouse | Введите её Product ID в **Devices → My device is missing** (не проверено) |
+| Другая мышь поддерживаемого производителя | Введите её Product ID в **Devices → My device is missing** (не проверено) |
 | Геймпад Xbox | Подключите его без провода и включите |
 
 ## Устройства
@@ -142,4 +144,4 @@ WhiteHub отправляет только запросы на чтение за
 
 [GPL-3.0](LICENSE), © 2026 whitemollie. Источники протоколов и благодарности: [CREDITS.md](CREDITS.md).
 
-<sub>WhiteHub — независимый проект, не связанный с WLmouse, HyperX и HP.</sub>
+<sub>WhiteHub — независимый проект, не связанный с производителями устройств.</sub>

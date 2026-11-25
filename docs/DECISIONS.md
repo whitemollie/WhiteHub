@@ -30,7 +30,7 @@ Sizing the window to its content caused flicker. Longer pages scroll.
 The project builds on GPL-3.0 sources. The credits in [CREDITS.md](../CREDITS.md) must stay.
 
 ### 10. Query only an allowlist of USB IDs, read-only (0.1.9)
-Vendors use their own protocols, and probing unknown hardware is risky. Other WLmouse models need a product ID entered by the user. **Cost:** every other 2.4 GHz device needs its own support.
+Vendors use their own protocols, and probing unknown hardware is risky. Other models of the mouse vendor need a product ID entered by the user. **Cost:** every other 2.4 GHz device needs its own support.
 
 ### 11. Embed the WebView2 bootstrapper (0.1.9)
 The installer carries Microsoft's signed bootstrapper instead of downloading it. **Cost:** a larger installer.

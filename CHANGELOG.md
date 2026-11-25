@@ -1,9 +1,13 @@
 # What's new
 
+## Unreleased
+
+- Texts in the window name models only where it is needed
+
 ## 0.2.3 — 2026-11-25
 
 - The empty dashboard and "My device is missing" explain which devices appear
-- The product ID of another WLmouse mouse can be entered before one was ever found
+- The product ID of another mouse model can be entered before one was ever found
 - A device type set back to automatic is right even while the device is away
 - The program no longer contains folder names of the build computer
 
@@ -27,7 +31,7 @@
 
 ## 0.1.9 — 2026-11-25
 
-- Only tested devices are queried automatically; other WLmouse models need a product ID entered by hand
+- Only tested devices are queried automatically; other models need a product ID entered by hand
 - Events pushed by a device are rate-limited
 - The installer contains Microsoft's WebView2 bootstrapper instead of downloading it
 
@@ -69,4 +73,4 @@
 
 ## 0.1.0 — 2026-11-24
 
-- First version: WLmouse Beast G and HyperX Cloud III S Wireless, taskbar strip, notifications, themes, autostart
+- First version: one wireless mouse and one headset, taskbar strip, notifications, themes, autostart

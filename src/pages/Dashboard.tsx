@@ -52,7 +52,7 @@ function EmptyState() {
         <p>No device found yet. Connect one, it appears by itself:</p>
         <ul class="empty-list">
           <li>Bluetooth: any device whose battery Windows shows</li>
-          <li>2.4 GHz dongle: WLmouse Beast G, HyperX Cloud III S Wireless</li>
+          <li>2.4 GHz dongle: supported models, see About</li>
           <li>Xbox wireless controllers</li>
         </ul>
         <button type="button" class="link" onClick={() => navigate("devices")}>
