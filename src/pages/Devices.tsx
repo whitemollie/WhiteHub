@@ -108,7 +108,7 @@ function DeviceSection(props: { device: Device }) {
           onChange={(e) => set((c) => (c.name = e.currentTarget.value.trim() || null), 0)}
         />
       </Row>
-      <Row title="USB product ID" hint="Optional. Limit discovery to one receiver, e.g. A860.">
+      <Row title="USB product ID" hint="Optional. Use only this receiver, e.g. A860. Other models are untested.">
         <input
           class="input mono narrow"
           placeholder="Auto"

@@ -12,8 +12,9 @@
 //! The receiver relays the query to the mouse; a sleeping mouse never answers, so `A0` persists.
 //! With the charging cable attached, the mouse enumerates as its own USB device (36A7:A861) and
 //! answers the same query directly with CC = 1, while the receiver reports A0 (verified).
-//! Other WLmouse receivers on VID 36A7 use the same query according to the hub code and
-//! community tools, but only A860 has been tested.
+//! Only these two tested devices are queried automatically: the vendor ID is shared with other
+//! products (including keyboards), for which the command may mean something else. Another
+//! receiver can be selected by its product ID in the settings.
 //!
 //! Written with the driver of ferloom/Wireless-Device-Battery-Monitor (GPL-3.0) as a reference.
 use super::{
@@ -26,6 +27,8 @@ use std::{ffi::CString, thread::sleep, time::Duration};
 
 pub const ID: &str = "wlmouse";
 pub const VID: u16 = 0x36A7;
+/// Beast G receiver and Beast G on its charging cable.
+pub const PIDS: [u16; 2] = [0xA860, 0xA861];
 const VENDOR_PAGE: u16 = 0xFFFF;
 const CMD_BATTERY: u8 = 0x83;
 const ST_READY: u8 = 0xA1;
@@ -82,7 +85,7 @@ impl WlMouse {
     }
 
     fn matches(&self, vid: u16, pid: u16) -> bool {
-        vid == VID && self.product_filter.map_or(true, |p| p == pid)
+        vid == VID && self.product_filter.map_or(PIDS.contains(&pid), |p| p == pid)
     }
 
     fn query(dev: &HidDevice) -> Result<Reply, String> {
@@ -222,6 +225,16 @@ mod tests {
         assert_eq!(decode(&frame(true, &[0xA1, 0x00, 0x02, 0x02, 0x00, 0x83, 0x00, 0xC8])), Reply::Foreign);
         assert_eq!(decode(&frame(true, &[0xA3, 0x00, 0x02, 0x02, 0x00, 0x83, 0x00, 0x20])), Reply::Foreign);
         assert_eq!(decode(&[0x00, 0xA1]), Reply::Foreign);
+    }
+
+    #[test]
+    fn only_tested_devices_are_queried_unless_chosen() {
+        let mut m = WlMouse::new();
+        assert!(m.matches(VID, 0xA860) && m.matches(VID, 0xA861));
+        assert!(!m.matches(VID, 0xA884), "untested product");
+        assert!(!m.matches(0x03F0, 0xA860), "other vendor");
+        m.set_product_filter(Some(0xA884));
+        assert!(m.matches(VID, 0xA884) && !m.matches(VID, 0xA860));
     }
 
     #[test]

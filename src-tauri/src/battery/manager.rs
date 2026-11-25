@@ -286,6 +286,14 @@ struct Worker {
 /// Delay between a pushed event and the poll, so the device has settled (e.g. charge state).
 const EVENT_SETTLE: Duration = Duration::from_millis(1500);
 
+/// A device that floods events must not flood the log and the command queue.
+const EVENT_MIN_GAP: Duration = Duration::from_secs(1);
+
+/// Whether an event at `now` may be handled, given the last handled one.
+fn event_due(last: Option<Instant>, now: Instant) -> bool {
+    last.map_or(true, |t| now.saturating_duration_since(t) >= EVENT_MIN_GAP)
+}
+
 /// Blocks on the device's input reports (no CPU while idle) and asks for a poll when the device
 /// reports a change. Ends when the device goes away. Returns whether the thread started.
 fn spawn_listener(id: &'static str, src: EventSource, tx: Sender<Cmd>) -> bool {
@@ -294,9 +302,13 @@ fn spawn_listener(id: &'static str, src: EventSource, tx: Sender<Cmd>) -> bool {
         .spawn(move || {
             log::info!("[{id}] listening for device events");
             let mut buf = [0u8; 64];
+            let mut last = None;
             loop {
                 match src.device.read_timeout(&mut buf, -1) {
-                    Ok(n) if n > 0 && (src.is_change)(&buf[..n]) => {
+                    // Dropping an event within the gap is safe: the poll it would request is
+                    // already due after EVENT_SETTLE, which is longer than the gap.
+                    Ok(n) if n > 0 && (src.is_change)(&buf[..n]) && event_due(last, Instant::now()) => {
+                        last = Some(Instant::now());
                         log::info!("[{id}] device event {}", super::hex(&buf[..n.min(6)]));
                         if tx.send(Cmd::RefreshIn(id, EVENT_SETTLE)).is_err() {
                             break;
@@ -547,6 +559,15 @@ mod tests {
         assert_eq!(low(&mut s, 15, true), 0, "charging re-arms, no alert");
         assert_eq!(low(&mut s, 14, false), 1);
         assert_eq!(low(&mut s, 100, false), 0, "never notify at full charge");
+    }
+
+    #[test]
+    fn event_floods_are_limited() {
+        let t = Instant::now();
+        assert!(event_due(None, t));
+        assert!(!event_due(Some(t), t + Duration::from_millis(999)));
+        assert!(event_due(Some(t), t + EVENT_MIN_GAP));
+        assert!(EVENT_SETTLE > EVENT_MIN_GAP, "a dropped event is covered by the pending poll");
     }
 
     #[test]

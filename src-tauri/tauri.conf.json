@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "WhiteHub",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "identifier": "com.whitehub.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -26,7 +26,7 @@
     "longDescription": "WhiteHub shows the battery level of a WLmouse Beast G and a HyperX Cloud III S Wireless on the Windows taskbar.",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
     "windows": {
-      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
+      "webviewInstallMode": { "type": "embedBootstrapper", "silent": true },
       "nsis": {
         "installMode": "currentUser",
         "installerHooks": "./windows/hooks.nsh"

@@ -35,6 +35,7 @@ const EVENT: [u8; 4] = [0x0D, 0x02, 0x03, 0x00];
 const EV_CHARGER: u8 = 0x0A;
 const EV_HEADSET: u8 = 0x0C;
 const BATTERY_TIMEOUT: Duration = Duration::from_millis(1500);
+const MAX_STALE_REPORTS: usize = 256;
 const CHARGE_TIMEOUT: Duration = Duration::from_millis(600);
 
 #[derive(Debug, PartialEq, Eq)]
@@ -124,8 +125,12 @@ impl HyperX {
 
     fn query(dev: &HidDevice) -> Result<Outcome, String> {
         let mut buf = [0u8; 64];
-        // Drop stale input queued on this handle.
-        while dev.read_timeout(&mut buf, 0).map_err(|e| e.to_string())? > 0 {}
+        // Drop stale input queued on this handle (bounded, whatever the device sends).
+        for _ in 0..MAX_STALE_REPORTS {
+            if dev.read_timeout(&mut buf, 0).map_err(|e| e.to_string())? == 0 {
+                break;
+            }
+        }
         let (percent, millivolts) = match Self::request(dev, CMD_BATTERY, BATTERY_TIMEOUT)? {
             Answer::Reply(Frame::Battery(Some(p), mv)) => (p, mv),
             // The dongle stays enumerated while the headset is off and simply never answers.

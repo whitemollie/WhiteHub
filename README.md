@@ -13,7 +13,7 @@ WhiteHub is **not universal**: every vendor uses its own protocol, and only thes
 | WLmouse Beast G | `36A7:A860` (receiver), `36A7:A861` (cable) | Tested on hardware |
 | HyperX Cloud III **S** Wireless | `03F0:06BE` | Tested on hardware |
 | HyperX Cloud III S Wireless, other dongle | `03F0:02CC` | Untested |
-| Other WLmouse mice (USB vendor `36A7`) | — | Detected, untested; some models use a different protocol |
+| Other WLmouse mice (USB vendor `36A7`) | product ID entered by hand | Untested; some models use a different protocol |
 
 Other mice, headsets, keyboards and Bluetooth devices are not supported yet. Without a supported device WhiteHub starts and shows `--`. [Request a device](../../issues/new?template=device-request.yml).
 
@@ -43,7 +43,7 @@ To uninstall: *Settings → Apps → WhiteHub*. The uninstaller asks whether to 
 
 ## Privacy and security
 
-No telemetry, accounts or network access. WhiteHub sends only read-only battery queries, and only to the HyperX dongles listed above and to USB devices of the vendor WLmouse (`36A7`). Settings live in `%APPDATA%\com.whitehub.desktop`, logs in `%LOCALAPPDATA%\com.whitehub.desktop`. To report a vulnerability, see [SECURITY.md](SECURITY.md).
+No telemetry, accounts or network access. WhiteHub sends only read-only battery queries, and only to the USB devices listed above or to one you choose by its product ID. Settings live in `%APPDATA%\com.whitehub.desktop`, logs in `%LOCALAPPDATA%\com.whitehub.desktop`. To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Build
 

@@ -7,8 +7,9 @@ Please do not open a public issue. Use **Security → Report a vulnerability** o
 ## Design
 
 - Runs as the current user, never needs administrator rights and installs no drivers.
-- No network access in normal operation. If the WebView2 runtime is missing, the installer downloads it from Microsoft.
-- Sends fixed, read-only battery queries only to listed HyperX dongles and to devices with the WLmouse USB vendor ID. Setting a product ID by hand narrows the WLmouse search, or points the HyperX query at another device of the same vendor.
+- No network access in normal operation. The installer contains Microsoft's WebView2 bootstrapper, which downloads the runtime from Microsoft if it is missing.
+- Sends fixed, read-only battery queries only to an allowlist of USB devices. Setting a product ID by hand replaces that list with the chosen product of the same vendor.
+- Events pushed by a device are rate-limited.
 - Device replies are validated (length, header, command, range). Text from USB descriptors is stripped of control characters.
 - The window shows only bundled files: strict content security policy, no external navigation, frozen prototypes and a minimal set of permissions.
 - Settings are validated on load. A broken file is set aside and replaced by defaults.
