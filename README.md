@@ -12,11 +12,6 @@ No vendor apps in the background. No drivers. No network access.
 ![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?style=flat-square)
 ![License](https://img.shields.io/badge/license-GPL--3.0-22C55E?style=flat-square)
 [![CI](https://github.com/whitemollie/WhiteHub/actions/workflows/ci.yml/badge.svg)](https://github.com/whitemollie/WhiteHub/actions/workflows/ci.yml)
-<br>
-![Rust](https://img.shields.io/badge/Rust-stable-CE422B?style=flat-square&logo=rust&logoColor=white)
-![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
-![SolidJS](https://img.shields.io/badge/SolidJS-1.9-2C4F7C?style=flat-square&logo=solid&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript&logoColor=white)
 
 **English** | [Русский](README.ru.md)
 

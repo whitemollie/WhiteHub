@@ -8,14 +8,14 @@ Evidence labels: **[checked]** was checked while writing this file, **[earlier]*
 
 | Item | State |
 |---|---|
-| Branch | `main`: the 0.2.2 commit on top of `86a2f35` (0.2.1, pushed); not pushed when this was written |
-| Working tree | Clean after the 0.2.2 commit; no stashes, no other branches |
-| Tags | `v0.1.0` to `v0.1.9`, `v0.2.0`, `v0.2.1`, all on the remote; no tag for 0.2.2 yet [checked] |
-| GitHub | `whitemollie/WhiteHub`, private, GPL-3.0; releases with installers for 0.1.0 to 0.2.1 (12), `v0.2.1` is the latest [checked]; no issues or pull requests [earlier] |
+| Branch | `main`; 0.2.2 is `482e7a1`, a later commit changes only texts; everything is pushed |
+| Working tree | Clean; no stashes, no other branches |
+| Tags | `v0.1.0` to `v0.1.9`, `v0.2.0` to `v0.2.2`; `v0.2.2` is on the remote and points to `482e7a1` [checked] |
+| GitHub | `whitemollie/WhiteHub`, private, GPL-3.0; releases with installers for all 13 tags, `v0.2.2` is the latest [checked]; no issues or pull requests [earlier] |
 | Version | 0.2.2 in `package.json`, `Cargo.toml`, `tauri.conf.json` and both lock files [checked] |
 | Tests | 56 passed, 0 failed, 1 ignored (`shell::render::tests::preview`, draws sample images by hand); clippy without warnings [checked] |
 | Type check | `tsc --noEmit` without errors [checked] |
-| CI for `86a2f35` | Run `45695508631` succeeded [checked]; 0.2.2 has not run |
+| CI for `482e7a1` | Run `45699046721` succeeded [checked] |
 | Installer | `release/WhiteHub_0.2.2_x64-setup.exe`, 3,633,692 bytes, not in git [checked] |
 | Installed copy | 0.2.1; strip embedded, WLmouse and HyperX reported a level (log) [checked] |
 
@@ -88,11 +88,11 @@ See [DECISIONS.md](DECISIONS.md); structure: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## 6. Next steps
 
-1. Push and tag 0.2.2 and publish its release, when the owner agrees.
+1. Done: 0.2.2 is pushed, tagged and released, CI passed.
 2. Owner installs `release/WhiteHub_0.2.2_x64-setup.exe` over 0.2.1 and looks at the tray icon.
 3. Owner checks that settings survived, then the strip with all three devices, sleep and wake, and autostart after a reboot.
 4. Connect AirPods in Windows. If Windows shows their level, WhiteHub should too; if not, use "Create file".
 5. Fix what steps 3 and 4 reveal; otherwise no code change is needed.
-6. Done: releases 0.1.0 to 0.2.1 are published.
+6. Done: releases 0.1.0 to 0.2.2 are published.
 7. After approval: make the repository public, add the dynamic badges.
 8. Choose the scope of 0.3.
