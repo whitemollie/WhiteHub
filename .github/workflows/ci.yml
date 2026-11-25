@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+    # Texts and pictures do not need a build.
+    paths-ignore: ["**.md", "assets/screenshots/**", ".github/ISSUE_TEMPLATE/**"]
   pull_request:
 
 permissions:
@@ -10,7 +12,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # A cancelled run on main would show up as "failing" on the badge.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
