@@ -4,7 +4,7 @@ use crate::{
     battery::{manager::Cmd, DeviceSnapshot},
     logging,
     settings::Settings,
-    window,
+    system, window,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
@@ -77,7 +77,21 @@ pub fn quit(app: AppHandle) {
 
 #[tauri::command]
 pub fn open_logs_folder(state: State<'_, AppState>) -> Result<(), String> {
-    std::process::Command::new("explorer.exe").arg(&state.log_dir).spawn().map(|_| ()).map_err(|e| e.to_string())
+    explorer().arg(&state.log_dir).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
+/// Explorer by absolute path: a bare name would be searched in the application folder first.
+fn explorer() -> std::process::Command {
+    std::process::Command::new(system::windows_dir().join("explorer.exe"))
+}
+
+/// Replaces the user's profile folder, so a report can be shared without revealing the user name.
+fn redact(text: &str, profile: &str) -> String {
+    if profile.len() < 4 {
+        return text.to_owned();
+    }
+    // JSON escapes backslashes, so cover both spellings.
+    text.replace(&profile.replace('\\', "\\\\"), "%USERPROFILE%").replace(profile, "%USERPROFILE%")
 }
 
 /// Writes a plain-text diagnostics report to the desktop and selects it in Explorer.
@@ -89,10 +103,10 @@ pub fn export_diagnostics(app: AppHandle, state: State<'_, AppState>) -> Result<
             d.custom_icon = Some("<image omitted>".into());
         }
     }
-    let os = std::process::Command::new("cmd").args(["/c", "ver"]).output().map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default();
     let report = format!(
-        "WhiteHub diagnostics\nVersion: {}\nOS: {os}\nExecutable: {}\nAutostart registered: {}\nStrip embedded: {:?}\n\n== Devices ==\n{}\n\n== Settings ==\n{}\n\n== Log ==\n{}",
+        "WhiteHub diagnostics\nVersion: {}\nWindows build: {}\nExecutable: {}\nAutostart registered: {}\nStrip embedded: {:?}\n\n== Devices ==\n{}\n\n== Settings ==\n{}\n\n== Log ==\n{}",
         app.package_info().version,
+        system::windows_build(),
         std::env::current_exe().map(|p| p.display().to_string()).unwrap_or_default(),
         crate::autostart::is_enabled(),
         state.strip_available(),
@@ -100,11 +114,27 @@ pub fn export_diagnostics(app: AppHandle, state: State<'_, AppState>) -> Result<
         serde_json::to_string_pretty(&settings).unwrap_or_default(),
         logging::read_all(),
     );
+    let profile = app.path().home_dir().map(|p| p.display().to_string()).unwrap_or_default();
     let dir = app.path().desktop_dir().or_else(|_| app.path().download_dir()).map_err(|e| e.to_string())?;
     let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     let path = dir.join(format!("WhiteHub-diagnostics-{stamp}.txt"));
-    std::fs::write(&path, report).map_err(|e| e.to_string())?;
-    log::info!("[app] diagnostics exported to {}", path.display());
-    let _ = std::process::Command::new("explorer.exe").arg(format!("/select,{}", path.display())).spawn();
+    std::fs::write(&path, redact(&report, &profile)).map_err(|e| e.to_string())?;
+    log::info!("[app] diagnostics exported");
+    let _ = explorer().arg(format!("/select,{}", path.display())).spawn();
     Ok(path.display().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::redact;
+
+    #[test]
+    fn report_hides_the_profile_folder() {
+        let profile = r"C:\Users\Jane";
+        let text = "log C:\\Users\\Jane\\AppData json \"C:\\\\Users\\\\Jane\\\\x\"";
+        let out = redact(text, profile);
+        assert!(!out.contains("Jane"), "{out}");
+        assert_eq!(out.matches("%USERPROFILE%").count(), 2);
+        assert_eq!(redact("abc", ""), "abc");
+    }
 }

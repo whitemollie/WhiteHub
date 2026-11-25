@@ -64,8 +64,10 @@ pub trait Provider: Send {
     }
 }
 
-/// Removes vendor noise such as "RECEIVER" and repeated spaces from USB product strings.
+/// Removes vendor noise such as "RECEIVER", control characters and repeated spaces from USB product
+/// strings (any plugged-in device controls that text).
 pub fn clean_product(s: &str) -> String {
+    let s: String = s.chars().map(|c| if c.is_control() { ' ' } else { c }).take(80).collect();
     let words: Vec<&str> = s.split_whitespace().filter(|w| !w.eq_ignore_ascii_case("receiver")).collect();
     words.join(" ")
 }
@@ -76,4 +78,16 @@ pub fn signature_of(api: &HidApi, matches: impl Fn(&hidapi::DeviceInfo) -> bool)
     ids.sort();
     ids.dedup();
     ids.join(",")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clean_product;
+
+    #[test]
+    fn product_names_are_cleaned() {
+        assert_eq!(clean_product("WLMOUSE  BEAST G 8K RECEIVER"), "WLMOUSE BEAST G 8K");
+        assert_eq!(clean_product("Evil\n2026 INFO fake\u{1b}[0m"), "Evil 2026 INFO fake [0m");
+        assert!(clean_product(&"x".repeat(500)).len() <= 80);
+    }
 }

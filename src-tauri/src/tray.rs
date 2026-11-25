@@ -25,7 +25,7 @@ pub struct Trays {
 pub struct TrayState(pub Mutex<Option<Trays>>);
 
 pub fn icon_size() -> u32 {
-    unsafe { GetSystemMetricsForDpi(SM_CXSMICON as i32, GetDpiForSystem()).clamp(16, 64) as u32 }
+    unsafe { GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForSystem()).clamp(16, 64) as u32 }
 }
 
 pub fn fg(light_taskbar: bool) -> [u8; 3] {

@@ -10,6 +10,7 @@ mod logging;
 mod notifications;
 mod settings;
 mod shell;
+mod system;
 mod tray;
 mod window;
 

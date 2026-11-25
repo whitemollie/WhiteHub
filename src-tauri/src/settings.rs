@@ -221,7 +221,7 @@ impl Settings {
             let d = self.devices.entry(id.to_string()).or_default();
             d.low_threshold = d.low_threshold.clamp(5, 50);
             if let Some(n) = &d.name {
-                let t: String = n.trim().chars().take(40).collect();
+                let t: String = n.trim().chars().filter(|c| !c.is_control()).take(40).collect();
                 d.name = (!t.is_empty()).then_some(t);
             }
             if let Some(p) = &d.product_id {
@@ -300,6 +300,7 @@ impl Store {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
 

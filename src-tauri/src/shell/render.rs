@@ -6,7 +6,7 @@ use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
 use std::sync::OnceLock;
 use windows_sys::Win32::{
     Foundation::{CloseHandle, GENERIC_READ, INVALID_HANDLE_VALUE},
-    Storage::FileSystem::{CreateFileW, GetFileSize, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, OPEN_EXISTING},
+    Storage::FileSystem::{CreateFileW, GetFileSize, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, INVALID_FILE_SIZE, OPEN_EXISTING},
     System::Memory::{CreateFileMappingW, MapViewOfFile, FILE_MAP_READ, PAGE_READONLY},
 };
 
@@ -75,13 +75,18 @@ pub struct Fonts {
 }
 
 fn map_font(name: &str) -> Option<&'static [u8]> {
-    let path: Vec<u16> = format!(r"C:\Windows\Fonts\{name}").encode_utf16().chain(Some(0)).collect();
+    let path = crate::system::windows_dir().join("Fonts").join(name);
+    let path: Vec<u16> = path.to_string_lossy().encode_utf16().chain(Some(0)).collect();
     unsafe {
         let file = CreateFileW(path.as_ptr(), GENERIC_READ, FILE_SHARE_READ, std::ptr::null(), OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, std::ptr::null_mut());
         if file == INVALID_HANDLE_VALUE {
             return None;
         }
-        let size = GetFileSize(file, std::ptr::null_mut()) as usize;
+        let size = GetFileSize(file, std::ptr::null_mut());
+        if size == 0 || size == INVALID_FILE_SIZE {
+            CloseHandle(file);
+            return None;
+        }
         let mapping = CreateFileMappingW(file, std::ptr::null(), PAGE_READONLY, 0, 0, std::ptr::null());
         CloseHandle(file);
         if mapping.is_null() {
@@ -89,11 +94,11 @@ fn map_font(name: &str) -> Option<&'static [u8]> {
         }
         let view = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
         CloseHandle(mapping); // the view keeps the mapping alive
-        if view.Value.is_null() || size == 0 {
+        if view.Value.is_null() {
             return None;
         }
         // The view is intentionally never unmapped: fonts live for the whole process.
-        Some(std::slice::from_raw_parts(view.Value as *const u8, size))
+        Some(std::slice::from_raw_parts(view.Value as *const u8, size as usize))
     }
 }
 
@@ -110,6 +115,13 @@ pub fn fonts() -> Option<&'static Fonts> {
             text.map(|text| Fonts { strip: strip.unwrap_or_else(|| text.clone()), text, icons })
         })
         .as_ref()
+}
+
+/// Colour and opacity of a drawing operation.
+#[derive(Clone, Copy)]
+pub struct Paint {
+    pub rgb: [u8; 3],
+    pub alpha: f32,
 }
 
 /// Premultiplied RGBA canvas in f32.
@@ -181,7 +193,7 @@ impl Canvas {
     }
 
     /// Draws `s` with its baseline at `base`; returns the pen position after the last glyph.
-    pub fn text(&mut self, font: &FontRef, size: f32, s: &str, mut x: f32, base: f32, rgb: [u8; 3], alpha: f32) -> f32 {
+    pub fn text(&mut self, font: &FontRef, size: f32, s: &str, mut x: f32, base: f32, paint: Paint) -> f32 {
         let scale = PxScale::from(size);
         let sf = font.as_scaled(scale);
         let mut prev = None;
@@ -192,7 +204,7 @@ impl Canvas {
             // Sub-pixel x keeps the letter spacing even; a whole-pixel baseline keeps edges crisp.
             if let Some(o) = font.outline_glyph(id.with_scale_and_position(scale, ab_glyph::point(x, base.round()))) {
                 let b = o.px_bounds();
-                o.draw(|gx, gy, cov| self.blend(b.min.x as i32 + gx as i32, b.min.y as i32 + gy as i32, cov, rgb, alpha));
+                o.draw(|gx, gy, cov| self.blend(b.min.x as i32 + gx as i32, b.min.y as i32 + gy as i32, cov, paint.rgb, paint.alpha));
             }
             x += sf.h_advance(id);
         }
@@ -308,12 +320,12 @@ pub fn render_strip(items: &[StripItem], height: u32, scale: f32, fg: [u8; 3]) -
                 // stroke that matches the digits.
                 let g = g.to_string();
                 let ib = centred_base(icons, icon_size, &g, mid);
-                c.text(icons, icon_size, &g, x + 0.7 * scale, ib, fg, alpha);
-                x = c.text(icons, icon_size, &g, x, ib, fg, alpha) + 0.7 * scale;
+                c.text(icons, icon_size, &g, x + 0.7 * scale, ib, Paint { rgb: fg, alpha });
+                x = c.text(icons, icon_size, &g, x, ib, Paint { rgb: fg, alpha }) + 0.7 * scale;
             }
-            _ => x = c.text(&f.strip, size, &it.label, x, base, fg, alpha * 0.7),
+            _ => x = c.text(&f.strip, size, &it.label, x, base, Paint { rgb: fg, alpha: alpha * 0.7 }),
         }
-        x = c.text(&f.strip, size, &it.text, x + gap_icon, base, color, alpha);
+        x = c.text(&f.strip, size, &it.text, x + gap_icon, base, Paint { rgb: color, alpha });
         if it.charging {
             x = draw_bolt(&mut c, x + bolt_gap, mid, bolt_h, fg, alpha);
         }
@@ -334,7 +346,7 @@ pub fn render_level_icon(size: u32, text: &str, level: Option<u8>, fg: [u8; 3], 
     }
     let w = measure(&f.text, px, text);
     let base = (avail + f.text.as_scaled(PxScale::from(px)).ascent() * 0.72) / 2.0 - 0.5;
-    c.text(&f.text, px, text, (size as f32 - w) / 2.0, base, fg, 1.0);
+    c.text(&f.text, px, text, (size as f32 - w) / 2.0, base, Paint { rgb: fg, alpha: 1.0 });
     let y0 = (size - bar_h) as i32;
     c.rect(0, y0, size as i32, size as i32, fg, 0.3);
     if let Some(l) = level {

@@ -172,7 +172,9 @@ fn open_on_main(app: &AppHandle, page: Option<String>) {
         .shadow(true)
         .visible(false)
         .focused(true)
-        .transparent(translucent);
+        .transparent(translucent)
+        // The popup only ever shows the bundled UI.
+        .on_navigation(|url| matches!(url.scheme(), "tauri" | "about") || url.host_str() == Some("tauri.localhost") || (cfg!(debug_assertions) && url.host_str() == Some("localhost")));
     b = if translucent {
         b.effects(EffectsBuilder::new().effect(Effect::Acrylic).build())
     } else {
