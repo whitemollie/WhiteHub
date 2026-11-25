@@ -45,18 +45,9 @@ To uninstall: *Settings → Apps → WhiteHub*. The uninstaller asks whether to 
 
 No telemetry, accounts or network access. WhiteHub sends only read-only battery queries, and only to the USB devices listed above or to one you choose by its product ID. Settings live in `%APPDATA%\com.whitehub.desktop`, logs in `%LOCALAPPDATA%\com.whitehub.desktop`. To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
-## Build
+## For developers
 
-Requires Rust (stable, MSVC) and Node.js 22+.
-
-```powershell
-npm ci
-npm run tauri dev                      # development
-cargo test --manifest-path src-tauri/Cargo.toml
-npm run tauri build                    # release build and installer
-```
-
-Device protocols: [docs/PROTOCOLS.md](docs/PROTOCOLS.md). To add a device, implement `battery::provider::Provider`, register it in `app.rs` and add its ID to `settings::DEVICE_IDS`.
+Users only need the installer. Building from source and adding devices: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 
