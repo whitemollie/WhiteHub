@@ -1,6 +1,6 @@
 //! Software rendering of the taskbar strip and tray icons.
 //!
-//! System fonts (Segoe UI Bold, Segoe Fluent Icons) are memory-mapped rather than read into the
+//! System fonts (Segoe UI Black/Bold, Segoe Fluent Icons) are memory-mapped rather than read into the
 //! heap, so they cost shared file-backed pages instead of private memory.
 use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
 use std::sync::OnceLock;
@@ -69,6 +69,8 @@ fn draw_bolt(c: &mut Canvas, x: f32, cy: f32, h: f32, rgb: [u8; 3], alpha: f32) 
 
 pub struct Fonts {
     text: FontRef<'static>,
+    /// Heavier face for the taskbar strip.
+    strip: FontRef<'static>,
     icons: Option<FontRef<'static>>,
 }
 
@@ -104,7 +106,8 @@ pub fn fonts() -> Option<&'static Fonts> {
             if text.is_none() {
                 log::error!("[render] Segoe UI not found; indicators cannot be drawn");
             }
-            text.map(|text| Fonts { text, icons })
+            let strip = map_font("seguibl.ttf").and_then(|b| FontRef::try_from_slice(b).ok());
+            text.map(|text| Fonts { strip: strip.unwrap_or_else(|| text.clone()), text, icons })
         })
         .as_ref()
 }
@@ -181,9 +184,13 @@ impl Canvas {
     pub fn text(&mut self, font: &FontRef, size: f32, s: &str, mut x: f32, base: f32, rgb: [u8; 3], alpha: f32) -> f32 {
         let scale = PxScale::from(size);
         let sf = font.as_scaled(scale);
+        let mut prev = None;
         for c in s.chars() {
             let id = font.glyph_id(c);
-            if let Some(o) = font.outline_glyph(id.with_scale_and_position(scale, ab_glyph::point(x.round(), base.round()))) {
+            x += prev.map_or(0.0, |p| sf.kern(p, id));
+            prev = Some(id);
+            // Sub-pixel x keeps the letter spacing even; a whole-pixel baseline keeps edges crisp.
+            if let Some(o) = font.outline_glyph(id.with_scale_and_position(scale, ab_glyph::point(x, base.round()))) {
                 let b = o.px_bounds();
                 o.draw(|gx, gy, cov| self.blend(b.min.x as i32 + gx as i32, b.min.y as i32 + gy as i32, cov, rgb, alpha));
             }
@@ -220,7 +227,29 @@ impl Canvas {
 
 pub fn measure(font: &FontRef, size: f32, s: &str) -> f32 {
     let sf = font.as_scaled(PxScale::from(size));
-    s.chars().map(|c| sf.h_advance(font.glyph_id(c))).sum()
+    let ids: Vec<_> = s.chars().map(|c| font.glyph_id(c)).collect();
+    ids.iter().map(|&id| sf.h_advance(id)).sum::<f32>() + ids.windows(2).map(|p| sf.kern(p[0], p[1])).sum::<f32>()
+}
+
+/// Top and bottom of the drawn outlines relative to the baseline (y grows downwards).
+fn vertical_extent(font: &FontRef, size: f32, s: &str) -> Option<(f32, f32)> {
+    s.chars()
+        .filter_map(|c| font.outline_glyph(font.glyph_id(c).with_scale(PxScale::from(size))))
+        .map(|o| (o.px_bounds().min.y, o.px_bounds().max.y))
+        .reduce(|a, b| (a.0.min(b.0), a.1.max(b.1)))
+}
+
+/// Baseline that centres `s` on `mid`.
+fn centred_base(font: &FontRef, size: f32, s: &str, mid: f32) -> f32 {
+    let (top, bottom) = vertical_extent(font, size, s).unwrap_or((0.0, 0.0));
+    (mid - (top + bottom) / 2.0).round()
+}
+
+/// Font size at which digits are `height` pixels tall.
+fn size_for_digits(font: &FontRef, height: f32) -> f32 {
+    const PROBE: f32 = 1000.0;
+    let (top, bottom) = vertical_extent(font, PROBE, "0").unwrap_or((-700.0, 0.0));
+    height / (bottom - top) * PROBE
 }
 
 /// One device in the taskbar strip.
@@ -245,21 +274,25 @@ pub struct RenderedStrip {
     pub regions: Vec<(i32, i32)>,
 }
 
+/// Height of the strip's digits in logical pixels.
+const DIGIT_HEIGHT: f32 = 10.7;
+
 pub fn render_strip(items: &[StripItem], height: u32, scale: f32, fg: [u8; 3]) -> Option<RenderedStrip> {
     let f = fonts()?;
-    let size = 15.0 * scale;
-    let (gap_icon, gap_item, pad) = (5.0 * scale, 16.0 * scale, 8.0 * scale);
-    let (bolt_h, bolt_gap) = (14.0 * scale, 3.5 * scale);
+    let mid = height as f32 / 2.0;
+    let (size, icon_size) = (size_for_digits(&f.strip, DIGIT_HEIGHT * scale), 14.0 * scale);
+    let (gap_icon, gap_item, pad) = (5.5 * scale, 16.0 * scale, 8.0 * scale);
+    let (bolt_h, bolt_gap) = (13.0 * scale, 4.0 * scale);
     let bolt = bolt_h * BOLT_ASPECT;
     let icon_w = |it: &StripItem| match (it.glyph, &f.icons) {
-        (Some(g), Some(icons)) => measure(icons, size, &g.to_string()) + 0.7 * scale,
-        _ => measure(&f.text, size, &it.label),
+        (Some(g), Some(icons)) => measure(icons, icon_size, &g.to_string()) + 0.7 * scale,
+        _ => measure(&f.strip, size, &it.label),
     };
-    let item_w = |it: &StripItem| icon_w(it) + gap_icon + measure(&f.text, size, &it.text) + if it.charging { bolt + bolt_gap } else { 0.0 };
+    let item_w = |it: &StripItem| icon_w(it) + gap_icon + measure(&f.strip, size, &it.text) + if it.charging { bolt + bolt_gap } else { 0.0 };
     let width = pad * 2.0 + items.iter().map(item_w).sum::<f32>() + gap_item * items.len().saturating_sub(1) as f32;
     let w = width.ceil().max(1.0) as u32;
     let mut c = Canvas::new(w, height);
-    let base = (height as f32 + f.text.as_scaled(PxScale::from(size)).ascent() * 0.70) / 2.0;
+    let base = centred_base(&f.strip, size, "0", mid);
     let mut x = pad;
     let mut regions = Vec::new();
     for (i, it) in items.iter().enumerate() {
@@ -271,18 +304,18 @@ pub fn render_strip(items: &[StripItem], height: u32, scale: f32, fg: [u8; 3]) -
         let color = it.color.unwrap_or(fg);
         match (it.glyph, &f.icons) {
             (Some(g), Some(icons)) => {
-                // Fluent icons sit on the baseline; centre optically. They have no bold weight, so
-                // overdraw with a sub-pixel offset for a heavier stroke matching the bold text.
-                let ib = (height as f32 + icons.as_scaled(PxScale::from(size)).ascent() * 0.80) / 2.0;
+                // Fluent icons have no bold weight: overdraw with a sub-pixel offset for a heavier
+                // stroke that matches the digits.
                 let g = g.to_string();
-                c.text(icons, size, &g, x + 0.7 * scale, ib, fg, alpha);
-                x = c.text(icons, size, &g, x, ib, fg, alpha) + 0.7 * scale;
+                let ib = centred_base(icons, icon_size, &g, mid);
+                c.text(icons, icon_size, &g, x + 0.7 * scale, ib, fg, alpha);
+                x = c.text(icons, icon_size, &g, x, ib, fg, alpha) + 0.7 * scale;
             }
-            _ => x = c.text(&f.text, size, &it.label, x, base, fg, alpha * 0.7),
+            _ => x = c.text(&f.strip, size, &it.label, x, base, fg, alpha * 0.7),
         }
-        x = c.text(&f.text, size, &it.text, x + gap_icon, base, color, alpha);
+        x = c.text(&f.strip, size, &it.text, x + gap_icon, base, color, alpha);
         if it.charging {
-            x = draw_bolt(&mut c, x + bolt_gap, height as f32 / 2.0, bolt_h, fg, alpha);
+            x = draw_bolt(&mut c, x + bolt_gap, mid, bolt_h, fg, alpha);
         }
         regions.push((start as i32 - (gap_item / 2.0) as i32, (x + gap_item / 2.0) as i32));
     }
@@ -356,6 +389,25 @@ mod tests {
     }
 
     #[test]
+    fn digits_and_icons_share_one_centre() {
+        let f = fonts().unwrap();
+        for scale in [1.0f32, 1.25, 1.5, 2.0] {
+            let mid = 48.0 * scale / 2.0;
+            let size = size_for_digits(&f.strip, DIGIT_HEIGHT * scale);
+            let check = |font: &FontRef, size: f32, s: &str| {
+                let (t, b) = vertical_extent(font, size, s).unwrap();
+                let centre = centred_base(font, size, s, mid) + (t + b) / 2.0;
+                assert!((centre - mid).abs() <= 0.5, "{s} is off centre by {} at {scale}x", centre - mid);
+            };
+            check(&f.strip, size, "0");
+            if let Some(icons) = &f.icons {
+                check(icons, 14.0 * scale, &GLYPH_MOUSE.to_string());
+                check(icons, 14.0 * scale, &GLYPH_HEADPHONE.to_string());
+            }
+        }
+    }
+
+    #[test]
     fn bolt_is_filled_and_rounded() {
         let mut c = Canvas::new(20, 30);
         let right = draw_bolt(&mut c, 2.0, 15.0, 24.0, [255, 255, 255], 1.0);
@@ -371,7 +423,7 @@ mod tests {
     fn preview() {
         let Ok(path) = std::env::var("WHITEHUB_PREVIEW") else { return };
         let items = [
-            StripItem { glyph: Some(GLYPH_MOUSE), label: "M".into(), text: "47%".into(), color: None, dim: false, charging: true, tooltip: String::new() },
+            StripItem { glyph: Some(GLYPH_MOUSE), label: "M".into(), text: "58%".into(), color: None, dim: false, charging: false, tooltip: String::new() },
             StripItem { glyph: Some(GLYPH_HEADPHONE), label: "H".into(), text: "45%".into(), color: None, dim: false, charging: true, tooltip: String::new() },
         ];
         let r = render_strip(&items, 72, 1.5, [255, 255, 255]).unwrap();
