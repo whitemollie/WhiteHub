@@ -1,5 +1,10 @@
 # What's new
 
+## 0.2.1 — 2026-11-25
+
+- Updates keep the autostart entry and a choice made in Task Manager to disable it (works from the first update after 0.2.1 on)
+- The installer description names all supported kinds of devices
+
 ## 0.2.0 — 2026-11-25
 
 - Devices appear by themselves; the list is no longer fixed
