@@ -111,8 +111,7 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         &settings,
         Box::new(move |snaps, events| on_devices(&h, snaps, events)),
     );
-    let light = shell::taskbar_is_light();
-    let trays = tray::create(app, light)?;
+    let trays = tray::create(app)?;
     app.manage(TrayState(Mutex::new(Some(trays))));
     app.manage(AppState {
         settings: Mutex::new(settings),
@@ -121,7 +120,7 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         shell,
         log_dir,
         strip_available: Mutex::new(None),
-        light_taskbar: AtomicBool::new(light),
+        light_taskbar: AtomicBool::new(shell::taskbar_is_light()),
     });
     refresh_indicators(app);
     let args: Vec<String> = std::env::args().collect();
@@ -248,7 +247,6 @@ fn refresh_indicators_with(app: &AppHandle, settings: &Settings, snaps: &[Device
     let app2 = app.clone();
     let _ = app.run_on_main_thread(move || {
         tray::with(&app2, |t| {
-            t.set_theme(light);
             t.set_summary(&summary);
             t.set_levels(&app2, &levels, show_tray, light);
         });

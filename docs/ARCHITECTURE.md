@@ -1,6 +1,6 @@
 # Architecture
 
-How WhiteHub 0.2.1 is built. Reasons: [DECISIONS.md](DECISIONS.md). Device protocols: [PROTOCOLS.md](PROTOCOLS.md). Current status: [PROJECT_STATE.md](PROJECT_STATE.md).
+How WhiteHub 0.2.2 is built. Reasons: [DECISIONS.md](DECISIONS.md). Device protocols: [PROTOCOLS.md](PROTOCOLS.md). Current status: [PROJECT_STATE.md](PROJECT_STATE.md).
 
 One Windows process in Rust (Tauri 2). The user interface (SolidJS, TypeScript, Vite) runs in WebView2, which exists only while the window is open.
 
@@ -43,7 +43,7 @@ flowchart LR
 | `battery/report.rs` | Text of a device request |
 | `indicators.rs` | Turns snapshots into strip items and tray levels |
 | `shell/mod.rs` | Strip window, embedding, tooltips, Windows messages |
-| `shell/render.rs` | Draws the strip and tray icons |
+| `shell/render.rs` | Draws the strip, the device tray icons and the logo in the tray |
 | `tray.rs` | Notification-area icons |
 | `window.rs` | Window: creation, placement, reveal, fade, destruction |
 | `commands.rs` | Everything the window may call |

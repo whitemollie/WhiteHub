@@ -1,5 +1,9 @@
 # What's new
 
+## 0.2.2 — 2026-11-25
+
+- The tray icon is now the WhiteHub logo
+
 ## 0.2.1 — 2026-11-25
 
 - Updates keep the autostart entry and a choice made in Task Manager to disable it (works from the first update after 0.2.1 on)

@@ -32,12 +32,12 @@ pub fn fg(light_taskbar: bool) -> [u8; 3] {
     if light_taskbar { [0x1a, 0x1a, 0x1a] } else { [0xff, 0xff, 0xff] }
 }
 
-fn app_image(light: bool) -> Image<'static> {
+fn app_image() -> Image<'static> {
     let size = icon_size();
-    Image::new_owned(render::render_app_icon(size, fg(light)), size, size)
+    Image::new_owned(render::render_app_icon(size), size, size)
 }
 
-pub fn create(app: &AppHandle, light: bool) -> tauri::Result<Trays> {
+pub fn create(app: &AppHandle) -> tauri::Result<Trays> {
     let menu = Menu::with_items(
         app,
         &[
@@ -49,7 +49,7 @@ pub fn create(app: &AppHandle, light: bool) -> tauri::Result<Trays> {
         ],
     )?;
     let app_icon = TrayIconBuilder::with_id("whitehub")
-        .icon(app_image(light))
+        .icon(app_image())
         .tooltip("WhiteHub")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -73,10 +73,6 @@ pub fn create(app: &AppHandle, light: bool) -> tauri::Result<Trays> {
 }
 
 impl Trays {
-    pub fn set_theme(&self, light: bool) {
-        let _ = self.app_icon.set_icon(Some(app_image(light)));
-    }
-
     pub fn set_summary(&self, text: &str) {
         let _ = self.app_icon.set_tooltip(Some(text));
     }

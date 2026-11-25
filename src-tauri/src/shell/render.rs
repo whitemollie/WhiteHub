@@ -359,19 +359,32 @@ pub fn render_level_icon(size: u32, text: &str, level: Option<u8>, fg: [u8; 3], 
     Some(c.to_rgba())
 }
 
-/// WhiteHub tray icon: a battery outline matching the app logo.
-pub fn render_app_icon(size: u32, fg: [u8; 3]) -> Vec<u8> {
-    let mut c = Canvas::new(size, size);
-    let s = size as f32 / 16.0;
-    let px = |v: f32| (v * s).round() as i32;
-    let (x0, y0, x1, y1, t) = (px(1.0), px(4.0), px(13.0), px(12.0), px(1.0).max(1));
-    c.rect(x0, y0, x1, y0 + t, fg, 1.0);
-    c.rect(x0, y1 - t, x1, y1, fg, 1.0);
-    c.rect(x0, y0, x0 + t, y1, fg, 1.0);
-    c.rect(x1 - t, y0, x1, y1, fg, 1.0);
-    c.rect(x1, px(6.0), x1 + t + px(0.5), px(10.0), fg, 1.0);
-    c.rect(x0 + 2 * t, y0 + 2 * t, px(8.0), y1 - 2 * t, fg, 1.0);
-    c.to_rgba()
+/// Signed distance from `p` to a rounded rectangle (x, y, width, height, radius).
+fn rounded_rect(p: (f32, f32), [x, y, w, h, r]: [f32; 5]) -> f32 {
+    let qx = (p.0 - x - w / 2.0).abs() - w / 2.0 + r;
+    let qy = (p.1 - y - h / 2.0).abs() - h / 2.0 + r;
+    qx.max(0.0).hypot(qy.max(0.0)) + qx.max(qy).min(0.0) - r
+}
+
+/// WhiteHub tray icon: the logo. Shapes and colours are those of `assets/app-icon.svg`
+/// (its 3-unit border is left out, it disappears at icon sizes). Straight-alpha RGBA.
+pub fn render_app_icon(size: u32) -> Vec<u8> {
+    let unit = 1024.0 / size as f32;
+    let cover = |d: f32| (0.5 - d / unit).clamp(0.0, 1.0);
+    let mut out = Vec::with_capacity((size * size * 4) as usize);
+    for y in 0..size {
+        for x in 0..size {
+            let p = ((x as f32 + 0.5) * unit, (y as f32 + 0.5) * unit);
+            let tile = cover(rounded_rect(p, [32.0, 32.0, 960.0, 960.0, 220.0]));
+            let outline = cover(rounded_rect(p, [196.0, 352.0, 568.0, 320.0, 72.0]).abs() - 24.0);
+            let tip = cover(rounded_rect(p, [788.0, 452.0, 48.0, 120.0, 20.0]));
+            let charge = cover(rounded_rect(p, [268.0, 424.0, 248.0, 176.0, 28.0]));
+            let mark = outline.max(tip).max(charge);
+            let grey = (10.0 + 240.0 * mark).round() as u8;
+            out.extend_from_slice(&[grey, grey, grey, (tile * 255.0).round() as u8]);
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -462,6 +475,22 @@ mod tests {
             bmp.extend_from_slice(&[mix(p[0]), mix(p[1]), mix(p[2]), 255]);
         }
         std::fs::write(path, bmp).unwrap();
+    }
+
+    #[test]
+    fn app_icon_is_the_logo() {
+        for size in [16u32, 20, 24, 32, 64] {
+            let px = render_app_icon(size);
+            assert_eq!(px.len(), (size * size * 4) as usize);
+            // Pixel that contains a point of the 1024-unit logo.
+            let at = |x: u32, y: u32| {
+                let i = (((y * size / 1024) * size + x * size / 1024) * 4) as usize;
+                [px[i], px[i + 1], px[i + 2], px[i + 3]]
+            };
+            assert_eq!(at(0, 0)[3], 0, "the corner is transparent at {size}");
+            assert_eq!(at(512, 200), [10, 10, 10, 255], "black tile at {size}");
+            assert_eq!(at(400, 512), [250, 250, 250, 255], "white charge at {size}");
+        }
     }
 
     #[test]
