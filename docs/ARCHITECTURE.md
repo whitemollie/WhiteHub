@@ -1,6 +1,6 @@
 # Architecture
 
-How WhiteHub 0.2.3 is built. Reasons: [DECISIONS.md](DECISIONS.md). Device protocols: [PROTOCOLS.md](PROTOCOLS.md).
+How WhiteHub 0.2.4 is built. Reasons: [DECISIONS.md](DECISIONS.md). Device protocols: [PROTOCOLS.md](PROTOCOLS.md).
 
 One Windows process in Rust (Tauri 2). The user interface (SolidJS, TypeScript, Vite) runs in WebView2, which exists only while the window is open.
 
@@ -44,6 +44,7 @@ flowchart LR
 | `indicators.rs` | Turns snapshots into strip items and tray levels |
 | `shell/mod.rs` | Strip window, embedding, tooltips, Windows messages |
 | `shell/render.rs` | Draws the strip, the device tray icons and the logo in the tray |
+| `shell/icons.rs` | Strip icons and charging marks drawn as shapes |
 | `tray.rs` | Notification-area icons |
 | `window.rs` | Window: creation, placement, reveal, fade, destruction |
 | `commands.rs` | Everything the window may call |
@@ -95,7 +96,7 @@ One window, 640×560 (lower on small screens), above the notification area of th
 | `app/store.ts` | State; saves settings with a short delay |
 | `app/format.ts`, `app/theme.ts` | Texts, defaults, CSS variables |
 | `pages/*` | Dashboard, Devices, Appearance, Settings, About |
-| `components/*` | Sidebar, device card, controls, icons |
+| `components/*` | Sidebar, device card, controls, icons, strip previews |
 
 The interface never touches devices. Commands: `get_state`, `update_settings`, `default_settings`, `refresh`, `window_ready`, `close_window`, `forget_device`, `export_device_request`, `export_diagnostics`, `open_logs_folder`, `quit`. Window permissions: events and dragging only (`capabilities/default.json`).
 

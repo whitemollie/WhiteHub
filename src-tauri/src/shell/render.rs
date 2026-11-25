@@ -2,6 +2,8 @@
 //!
 //! System fonts (Segoe UI Black/Bold, Segoe Fluent Icons) are memory-mapped rather than read into the
 //! heap, so they cost shared file-backed pages instead of private memory.
+use super::icons::{draw_mark, draw_shape, mark_width, Shape};
+use crate::settings::ChargeMark;
 use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
 use std::sync::OnceLock;
 use windows_sys::Win32::{
@@ -18,7 +20,7 @@ pub const GLYPH_GAMEPAD: char = '\u{E7FC}';
 pub const GLYPH_BLUETOOTH: char = '\u{E702}';
 /// Filled charging bolt (iOS-style): outline in a unit box, width/height = BOLT_ASPECT.
 const BOLT: [(f32, f32); 6] = [(0.72, 0.0), (0.02, 0.58), (0.45, 0.58), (0.28, 1.0), (0.98, 0.42), (0.55, 0.42)];
-const BOLT_ASPECT: f32 = 0.62;
+pub const BOLT_ASPECT: f32 = 0.62;
 /// Corner radius relative to the bolt height.
 const BOLT_ROUND: f32 = 0.012;
 
@@ -61,13 +63,17 @@ fn rounded(points: &[(f32, f32)], r: f32) -> Vec<(f32, f32)> {
     out
 }
 
-/// Draws the filled bolt with its left edge at `x`, vertically centred on `cy`; returns the right edge.
-fn draw_bolt(c: &mut Canvas, x: f32, cy: f32, h: f32, rgb: [u8; 3], alpha: f32) -> f32 {
+/// Outline of the bolt in a box with the given top left corner and height.
+pub fn bolt_points(x: f32, y: f32, h: f32) -> Vec<(f32, f32)> {
     let w = h * BOLT_ASPECT;
-    let y = cy - h / 2.0;
     let pts: Vec<(f32, f32)> = BOLT.iter().map(|&(px, py)| (x + px * w, y + py * h)).collect();
-    c.polygon(&rounded(&pts, h * BOLT_ROUND), rgb, alpha);
-    x + w
+    rounded(&pts, h * BOLT_ROUND)
+}
+
+/// Draws the filled bolt with its left edge at `x`, vertically centred on `cy`; returns the right edge.
+pub fn draw_bolt(c: &mut Canvas, x: f32, cy: f32, h: f32, rgb: [u8; 3], alpha: f32) -> f32 {
+    c.polygon(&bolt_points(x, cy - h / 2.0, h), rgb, alpha);
+    x + h * BOLT_ASPECT
 }
 
 pub struct Fonts {
@@ -155,6 +161,20 @@ impl Canvas {
         for y in y0..y1 {
             for x in x0..x1 {
                 self.blend(x, y, 1.0, rgb, alpha);
+            }
+        }
+    }
+
+    /// Draws a shape given as a signed distance, in units of `unit` pixels from `origin`.
+    pub fn shape(&mut self, origin: (f32, f32), unit: f32, size: (f32, f32), paint: Paint, distance: impl Fn((f32, f32)) -> f32) {
+        let end = (origin.0 + size.0 * unit, origin.1 + size.1 * unit);
+        for y in origin.1.floor() as i32..end.1.ceil() as i32 {
+            for x in origin.0.floor() as i32..end.0.ceil() as i32 {
+                let p = ((x as f32 + 0.5 - origin.0) / unit, (y as f32 + 0.5 - origin.1) / unit);
+                let cover = (0.5 - distance(p) * unit).clamp(0.0, 1.0);
+                if cover > 0.0 {
+                    self.blend(x, y, cover, paint.rgb, paint.alpha);
+                }
             }
         }
     }
@@ -267,17 +287,27 @@ fn size_for_digits(font: &FontRef, height: f32) -> f32 {
     height / (bottom - top) * PROBE
 }
 
+/// How a device is marked in the strip.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum StripIcon {
+    Glyph(char),
+    Letter,
+    Shape(Shape),
+    Hidden,
+}
+
 /// One device in the taskbar strip.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StripItem {
-    /// Icon glyph, or `None` to draw `label` instead.
-    pub glyph: Option<char>,
-    pub label: String,
+    pub icon: StripIcon,
+    /// Letter for `StripIcon::Letter`, and for glyphs if the icon font is missing.
+    pub label: &'static str,
     pub text: String,
     /// `None` = taskbar text colour.
     pub color: Option<[u8; 3]>,
     pub dim: bool,
-    pub charging: bool,
+    /// `None` = not charging.
+    pub charging: Option<ChargeMark>,
     pub tooltip: String,
 }
 
@@ -297,13 +327,17 @@ pub fn render_strip(items: &[StripItem], height: u32, scale: f32, fg: [u8; 3]) -
     let mid = height as f32 / 2.0;
     let (size, icon_size) = (size_for_digits(&f.strip, DIGIT_HEIGHT * scale), 14.0 * scale);
     let (gap_icon, gap_item, pad) = (5.5 * scale, 16.0 * scale, 8.0 * scale);
-    let (bolt_h, bolt_gap) = (13.0 * scale, 4.0 * scale);
-    let bolt = bolt_h * BOLT_ASPECT;
-    let icon_w = |it: &StripItem| match (it.glyph, &f.icons) {
-        (Some(g), Some(icons)) => measure(icons, icon_size, &g.to_string()) + 0.7 * scale,
-        _ => measure(&f.strip, size, &it.label),
+    let (mark_h, mark_gap) = (13.0 * scale, 4.0 * scale);
+    // Shapes are a little larger than glyphs, which fill their box less.
+    let unit = 15.0 * scale / 16.0;
+    let icon_w = |it: &StripItem| match (it.icon, &f.icons) {
+        (StripIcon::Hidden, _) => 0.0,
+        (StripIcon::Shape(s), _) => s.width() * unit + gap_icon,
+        (StripIcon::Glyph(g), Some(icons)) => measure(icons, icon_size, &g.to_string()) + 0.7 * scale + gap_icon,
+        _ => measure(&f.strip, size, it.label) + gap_icon,
     };
-    let item_w = |it: &StripItem| icon_w(it) + gap_icon + measure(&f.strip, size, &it.text) + if it.charging { bolt + bolt_gap } else { 0.0 };
+    let mark_w = |m: ChargeMark| if m == ChargeMark::Hidden { 0.0 } else { mark_gap + mark_width(m, mark_h) };
+    let item_w = |it: &StripItem| icon_w(it) + measure(&f.strip, size, &it.text) + it.charging.map_or(0.0, mark_w);
     let width = pad * 2.0 + items.iter().map(item_w).sum::<f32>() + gap_item * items.len().saturating_sub(1) as f32;
     let w = width.ceil().max(1.0) as u32;
     let mut c = Canvas::new(w, height);
@@ -317,20 +351,23 @@ pub fn render_strip(items: &[StripItem], height: u32, scale: f32, fg: [u8; 3]) -
         let start = x;
         let alpha = if it.dim { 0.45 } else { 1.0 };
         let color = it.color.unwrap_or(fg);
-        match (it.glyph, &f.icons) {
-            (Some(g), Some(icons)) => {
+        let paint = Paint { rgb: fg, alpha };
+        match (it.icon, &f.icons) {
+            (StripIcon::Hidden, _) => {}
+            (StripIcon::Shape(s), _) => x = draw_shape(&mut c, s, (x, mid), unit, paint, Paint { rgb: color, alpha }) + gap_icon,
+            (StripIcon::Glyph(g), Some(icons)) => {
                 // Fluent icons have no bold weight: overdraw with a sub-pixel offset for a heavier
                 // stroke that matches the digits.
                 let g = g.to_string();
                 let ib = centred_base(icons, icon_size, &g, mid);
-                c.text(icons, icon_size, &g, x + 0.7 * scale, ib, Paint { rgb: fg, alpha });
-                x = c.text(icons, icon_size, &g, x, ib, Paint { rgb: fg, alpha }) + 0.7 * scale;
+                c.text(icons, icon_size, &g, x + 0.7 * scale, ib, paint);
+                x = c.text(icons, icon_size, &g, x, ib, paint) + 0.7 * scale + gap_icon;
             }
-            _ => x = c.text(&f.strip, size, &it.label, x, base, Paint { rgb: fg, alpha: alpha * 0.7 }),
+            _ => x = c.text(&f.strip, size, it.label, x, base, Paint { rgb: fg, alpha: alpha * 0.7 }) + gap_icon,
         }
-        x = c.text(&f.strip, size, &it.text, x + gap_icon, base, Paint { rgb: color, alpha });
-        if it.charging {
-            x = draw_bolt(&mut c, x + bolt_gap, mid, bolt_h, fg, alpha);
+        x = c.text(&f.strip, size, &it.text, x, base, Paint { rgb: color, alpha });
+        if let Some(mark) = it.charging.filter(|&m| m != ChargeMark::Hidden) {
+            x = draw_mark(&mut c, mark, (x + mark_gap, mid), mark_h, paint);
         }
         regions.push((start as i32 - (gap_item / 2.0) as i32, (x + gap_item / 2.0) as i32));
     }
@@ -360,7 +397,7 @@ pub fn render_level_icon(size: u32, text: &str, level: Option<u8>, fg: [u8; 3], 
 }
 
 /// Signed distance from `p` to a rounded rectangle (x, y, width, height, radius).
-fn rounded_rect(p: (f32, f32), [x, y, w, h, r]: [f32; 5]) -> f32 {
+pub fn rounded_rect(p: (f32, f32), [x, y, w, h, r]: [f32; 5]) -> f32 {
     let qx = (p.0 - x - w / 2.0).abs() - w / 2.0 + r;
     let qy = (p.1 - y - h / 2.0).abs() - h / 2.0 + r;
     qx.max(0.0).hypot(qy.max(0.0)) + qx.max(qy).min(0.0) - r
@@ -405,8 +442,8 @@ mod tests {
     #[test]
     fn strip_renders_with_system_fonts() {
         let items = [
-            StripItem { glyph: Some(GLYPH_MOUSE), label: "M".into(), text: "82%".into(), color: None, dim: false, charging: false, tooltip: String::new() },
-            StripItem { glyph: Some(GLYPH_HEADPHONE), label: "H".into(), text: "--".into(), color: None, dim: true, charging: true, tooltip: String::new() },
+            StripItem { icon: StripIcon::Glyph(GLYPH_MOUSE), label: "M", text: "82%".into(), color: None, dim: false, charging: None, tooltip: String::new() },
+            StripItem { icon: StripIcon::Glyph(GLYPH_HEADPHONE), label: "H", text: "--".into(), color: None, dim: true, charging: Some(ChargeMark::Bolt), tooltip: String::new() },
         ];
         let r = render_strip(&items, 72, 1.5, [255, 255, 255]).expect("Segoe UI is present on Windows 11");
         assert_eq!(r.h, 72);
@@ -450,12 +487,20 @@ mod tests {
     #[ignore]
     fn preview() {
         let Ok(path) = std::env::var("WHITEHUB_PREVIEW") else { return };
+        let item = |icon, text: &str, mark| StripItem { icon, label: "M", text: text.into(), color: None, dim: false, charging: mark, tooltip: String::new() };
+        use crate::battery::DeviceKind::*;
         let items = [
-            StripItem { glyph: Some(GLYPH_MOUSE), label: "M".into(), text: "58%".into(), color: None, dim: false, charging: false, tooltip: String::new() },
-            StripItem { glyph: Some(GLYPH_HEADPHONE), label: "H".into(), text: "45%".into(), color: None, dim: false, charging: true, tooltip: String::new() },
-            StripItem { glyph: Some(GLYPH_KEYBOARD), label: "K".into(), text: "91%".into(), color: None, dim: false, charging: false, tooltip: String::new() },
-            StripItem { glyph: Some(GLYPH_GAMEPAD), label: "G".into(), text: "Full".into(), color: None, dim: false, charging: false, tooltip: String::new() },
-            StripItem { glyph: Some(GLYPH_BLUETOOTH), label: "B".into(), text: "52%".into(), color: None, dim: false, charging: false, tooltip: String::new() },
+            item(StripIcon::Glyph(GLYPH_MOUSE), "61%", Some(ChargeMark::Bolt)),
+            item(StripIcon::Glyph(GLYPH_HEADPHONE), "47%", Some(ChargeMark::BoltOutline)),
+            item(StripIcon::Shape(Shape::Filled(Mouse)), "61%", Some(ChargeMark::Plug)),
+            item(StripIcon::Shape(Shape::Filled(Headset)), "47%", Some(ChargeMark::Plus)),
+            item(StripIcon::Shape(Shape::Filled(Keyboard)), "91%", Some(ChargeMark::Hidden)),
+            item(StripIcon::Shape(Shape::Filled(Gamepad)), "Full", None),
+            item(StripIcon::Shape(Shape::Filled(Other)), "52%", None),
+            item(StripIcon::Shape(Shape::Battery(Some(61))), "61%", None),
+            item(StripIcon::Shape(Shape::Ring(Some(47))), "47%", None),
+            item(StripIcon::Letter, "61%", None),
+            item(StripIcon::Hidden, "61%", None),
         ];
         let scale: f32 = std::env::var("WHITEHUB_PREVIEW_SCALE").ok().and_then(|v| v.parse().ok()).unwrap_or(1.5);
         let r = render_strip(&items, (48.0 * scale) as u32, scale, [255, 255, 255]).unwrap();

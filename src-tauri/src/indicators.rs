@@ -2,7 +2,10 @@
 use crate::{
     battery::{DeviceKind, DeviceSnapshot, Level, Status},
     settings::{Colorize, IconSet, Settings},
-    shell::render::{StripItem, GLYPH_BLUETOOTH, GLYPH_GAMEPAD, GLYPH_HEADPHONE, GLYPH_HEADSET, GLYPH_KEYBOARD, GLYPH_MOUSE},
+    shell::{
+        icons::Shape,
+        render::{StripIcon, StripItem, GLYPH_BLUETOOTH, GLYPH_GAMEPAD, GLYPH_HEADPHONE, GLYPH_HEADSET, GLYPH_KEYBOARD, GLYPH_MOUSE},
+    },
 };
 
 pub const DEFAULT_HIGH: [u8; 3] = [0x22, 0xc5, 0x5e];
@@ -85,18 +88,27 @@ fn visible<'a>(settings: &'a Settings, snaps: &'a [DeviceSnapshot]) -> impl Iter
     snaps.iter().filter(move |s| s.known && s.enabled && (!s.discovered || s.status != Status::Disconnected) && settings.device(&s.id).show_in_indicator)
 }
 
+fn strip_icon(set: IconSet, s: &DeviceSnapshot) -> StripIcon {
+    match set {
+        IconSet::Text => StripIcon::Letter,
+        IconSet::Filled => StripIcon::Shape(Shape::Filled(s.kind)),
+        IconSet::Battery => StripIcon::Shape(Shape::Battery(approx(s))),
+        IconSet::Ring => StripIcon::Shape(Shape::Ring(approx(s))),
+        IconSet::Hidden => StripIcon::Hidden,
+        IconSet::Fluent | IconSet::Alternate => StripIcon::Glyph(match s.kind {
+            DeviceKind::Mouse => GLYPH_MOUSE,
+            DeviceKind::Keyboard => GLYPH_KEYBOARD,
+            DeviceKind::Headset if set == IconSet::Alternate => GLYPH_HEADSET,
+            DeviceKind::Headset => GLYPH_HEADPHONE,
+            DeviceKind::Gamepad => GLYPH_GAMEPAD,
+            DeviceKind::Other => GLYPH_BLUETOOTH,
+        }),
+    }
+}
+
 pub fn strip_items(settings: &Settings, snaps: &[DeviceSnapshot]) -> Vec<StripItem> {
     visible(settings, snaps)
         .map(|s| {
-            let glyph = match (settings.appearance.icon_set, s.kind) {
-                (IconSet::Text, _) => None,
-                (_, DeviceKind::Mouse) => Some(GLYPH_MOUSE),
-                (_, DeviceKind::Keyboard) => Some(GLYPH_KEYBOARD),
-                (IconSet::Alternate, DeviceKind::Headset) => Some(GLYPH_HEADSET),
-                (_, DeviceKind::Headset) => Some(GLYPH_HEADPHONE),
-                (_, DeviceKind::Gamepad) => Some(GLYPH_GAMEPAD),
-                (_, DeviceKind::Other) => Some(GLYPH_BLUETOOTH),
-            };
             let label = match s.kind {
                 DeviceKind::Mouse => "M",
                 DeviceKind::Keyboard => "K",
@@ -110,12 +122,12 @@ pub fn strip_items(settings: &Settings, snaps: &[DeviceSnapshot]) -> Vec<StripIt
                 Colorize::All => Some(level_color(settings, p)),
             });
             StripItem {
-                glyph,
-                label: label.into(),
+                icon: strip_icon(settings.device(&s.id).icon_set.unwrap_or(settings.appearance.icon_set), s),
+                label,
                 text: value(s).unwrap_or_else(|| "--".into()),
                 color,
                 dim: s.status != Status::Online,
-                charging: s.charging,
+                charging: s.charging.then_some(settings.indicators.charge_mark),
                 tooltip: tooltip(s),
             }
         })
@@ -153,6 +165,7 @@ pub fn tray_levels(settings: &Settings, snaps: &[DeviceSnapshot]) -> Vec<TrayLev
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::settings::ChargeMark;
 
     fn snap(status: Status, percent: Option<u8>) -> DeviceSnapshot {
         DeviceSnapshot {
@@ -198,6 +211,25 @@ mod tests {
         assert_eq!((items[1].text.as_str(), items[1].dim), ("--", true));
         let online = strip_items(&s, &[snap(Status::Online, Some(82))]);
         assert_eq!((online[0].text.as_str(), online[0].dim, online[0].color), ("82%", false, None));
+    }
+
+    #[test]
+    fn a_device_can_have_its_own_icon() {
+        let mut s = Settings::default();
+        s.appearance.icon_set = IconSet::Battery;
+        let mouse = snap(Status::Online, Some(61));
+        assert_eq!(strip_items(&s, std::slice::from_ref(&mouse))[0].icon, StripIcon::Shape(Shape::Battery(Some(61))));
+        s.devices.get_mut("wlmouse").unwrap().icon_set = Some(IconSet::Filled);
+        assert_eq!(strip_items(&s, &[mouse])[0].icon, StripIcon::Shape(Shape::Filled(DeviceKind::Mouse)));
+    }
+
+    #[test]
+    fn charging_devices_carry_the_chosen_mark() {
+        let mut s = Settings::default();
+        s.indicators.charge_mark = ChargeMark::Plug;
+        let charging = DeviceSnapshot { charging: true, ..snap(Status::Online, Some(61)) };
+        assert_eq!(strip_items(&s, &[charging])[0].charging, Some(ChargeMark::Plug));
+        assert_eq!(strip_items(&s, &[snap(Status::Online, Some(61))])[0].charging, None);
     }
 
     #[test]

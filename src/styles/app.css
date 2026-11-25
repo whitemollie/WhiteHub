@@ -457,6 +457,103 @@ h2 {
   box-shadow: 0 0 0 1px var(--border-strong);
 }
 
+/* ---------- Strip previews and tiles ---------- */
+:root {
+  --strip-bg: #1c1c1c;
+}
+.strip-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  min-height: 48px;
+  margin: 12px 0 4px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--strip-bg);
+  color: #fff;
+}
+.strip-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.strip-item.dim {
+  opacity: 0.45;
+}
+.strip-glyph {
+  font: 14px/1 "Segoe Fluent Icons", "Segoe MDL2 Assets";
+  -webkit-text-stroke: 0.5px currentColor;
+}
+.strip-value,
+.strip-letter {
+  font: 900 14px/1 "Segoe UI Black", "Segoe UI", sans-serif;
+}
+.strip-letter {
+  opacity: 0.7;
+}
+.row.stack > .row-control {
+  max-width: 100%;
+}
+.row.stack > .row-control:has(> .tiles) {
+  width: 100%;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(var(--columns), 1fr);
+  gap: 8px;
+  width: 100%;
+}
+.tiles.compact {
+  gap: 6px;
+}
+.tile {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-solid);
+  color: var(--muted);
+  transition:
+    border-color 120ms,
+    color 120ms;
+}
+.tile:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.tile.active {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  color: var(--text);
+}
+.tile-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 44px;
+  background: var(--strip-bg);
+  color: #fff;
+}
+.tiles.compact .tile-preview {
+  height: 34px;
+}
+.tile-label {
+  padding: 5px 4px 6px;
+  font-size: 11.5px;
+  text-align: center;
+  white-space: nowrap;
+}
+.tile-auto {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

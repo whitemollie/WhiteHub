@@ -6,6 +6,7 @@
 //!
 //! Because the strip's parent lives in Explorer, Windows attaches the input queues of both threads.
 //! This thread therefore never blocks: it only draws. All device I/O runs on the manager thread.
+pub mod icons;
 pub mod render;
 
 use crate::system::wide;

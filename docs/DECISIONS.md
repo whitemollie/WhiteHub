@@ -58,3 +58,6 @@ An update runs the old uninstaller in place and without `/UPDATE`, so `$UpdateMo
 
 ### 19. The tray icon is the full logo (0.2.2)
 Black tile included, as everywhere else. It looks the same on dark and light taskbars, so it does not follow the theme. It is drawn from the shapes of `assets/app-icon.svg` to be sharp at every size. **Cost:** the battery in it is small at 16 pixels.
+
+### 20. Icons beyond the system font are drawn as shapes (0.2.4)
+System fonts have no filled icons, batteries with a level or rings. Shapes are sharp at every scale and need no bundled files. The outline style stays the default. **Cost:** the previews in the window repeat the coordinates.

@@ -8,7 +8,7 @@
 
 No vendor apps in the background. No drivers. No network access.
 
-![Release](https://img.shields.io/badge/release-v0.2.3-0078D4?style=flat-square)
+![Release](https://img.shields.io/badge/release-v0.2.4-0078D4?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?style=flat-square)
 ![License](https://img.shields.io/badge/license-GPL--3.0-22C55E?style=flat-square)
 [![CI](https://github.com/whitemollie/WhiteHub/actions/workflows/ci.yml/badge.svg)](https://github.com/whitemollie/WhiteHub/actions/workflows/ci.yml)
@@ -33,7 +33,7 @@ No vendor apps in the background. No drivers. No network access.
 | **Always in sight** | Battery levels sit next to the clock, so you never have to open another app |
 | **Charging status** | A bolt appears when a device is on its cable |
 | **Timely alerts** | Low battery, connected and disconnected, with do not disturb |
-| **Your look** | Dark and light themes, custom colours, three icon styles |
+| **Your look** | Dark and light themes, custom colours, seven icon styles |
 | **Lightweight** | One background process; the window is loaded only while it is open |
 | **Private** | No telemetry, accounts or network requests |
 

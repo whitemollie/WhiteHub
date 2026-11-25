@@ -1,7 +1,9 @@
 # What's new
 
-## Unreleased
+## 0.2.4 — 2026-11-25
 
+- Seven icon styles and five charging marks for the taskbar strip, with a preview; every device can have its own icon
+- Shorter About page without folder names
 - Texts in the window name models only where it is needed
 
 ## 0.2.3 — 2026-11-25

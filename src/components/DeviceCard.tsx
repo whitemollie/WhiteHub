@@ -6,7 +6,7 @@ import { BluetoothIcon, BoltIcon, GamepadIcon, HeadphonesIcon, HeadsetIcon, Keyb
 
 export function DeviceGlyph(props: { device: Device; size?: number }) {
   const custom = () => deviceSettings(props.device.id)?.customIcon;
-  const set = () => state.settings?.appearance.iconSet;
+  const set = () => deviceSettings(props.device.id)?.iconSet ?? state.settings?.appearance.iconSet;
   return (
     <Show
       when={custom()}

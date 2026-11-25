@@ -52,6 +52,24 @@ pub enum IconSet {
     Alternate,
     /// Letters "M" / "H" instead of icons.
     Text,
+    Filled,
+    /// Battery or ring that shows the level instead of the device.
+    Battery,
+    Ring,
+    /// Only the number.
+    Hidden,
+}
+
+/// Mark after the level of a charging device.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum ChargeMark {
+    #[default]
+    Bolt,
+    BoltOutline,
+    Plug,
+    Plus,
+    Hidden,
 }
 
 /// Optional colour overrides; `None` means "use the theme default".
@@ -92,11 +110,12 @@ impl Default for Appearance {
 pub struct Indicators {
     pub mode: IndicatorMode,
     pub colorize: Colorize,
+    pub charge_mark: ChargeMark,
 }
 
 impl Default for Indicators {
     fn default() -> Self {
-        Self { mode: IndicatorMode::Taskbar, colorize: Colorize::LowOnly }
+        Self { mode: IndicatorMode::Taskbar, colorize: Colorize::LowOnly, charge_mark: ChargeMark::Bolt }
     }
 }
 
@@ -136,6 +155,8 @@ pub struct DeviceSettings {
     pub show_in_indicator: bool,
     /// Custom image (data URL, PNG/SVG/JPEG) shown on the dashboard card.
     pub custom_icon: Option<String>,
+    /// Strip icon of this device; `None` = the common style.
+    pub icon_set: Option<IconSet>,
     /// Device type chosen by the user, if the detected one is wrong.
     pub kind: Option<DeviceKind>,
     pub known: Option<KnownDevice>,
@@ -143,7 +164,7 @@ pub struct DeviceSettings {
 
 impl Default for DeviceSettings {
     fn default() -> Self {
-        Self { enabled: true, name: None, product_id: None, notify_low: true, low_threshold: 20, show_in_indicator: true, custom_icon: None, kind: None, known: None }
+        Self { enabled: true, name: None, product_id: None, notify_low: true, low_threshold: 20, show_in_indicator: true, custom_icon: None, icon_set: None, kind: None, known: None }
     }
 }
 
@@ -351,6 +372,15 @@ mod tests {
         assert!(s.validate().is_empty());
         assert_eq!(s.poll_interval_minutes, 5);
         assert_eq!(s.devices.len(), 2);
+    }
+
+    #[test]
+    fn older_files_keep_the_usual_icons() {
+        let s: Settings = serde_json::from_str(r#"{"appearance":{"iconSet":"alternate"},"indicators":{"mode":"tray"},"devices":{"hyperx":{}}}"#).unwrap();
+        assert_eq!((s.appearance.icon_set, s.indicators.charge_mark), (IconSet::Alternate, ChargeMark::Bolt));
+        assert_eq!(s.device("hyperx").icon_set, None);
+        let s: Settings = serde_json::from_str(r#"{"indicators":{"chargeMark":"boltOutline"},"devices":{"hyperx":{"iconSet":"ring"}}}"#).unwrap();
+        assert_eq!((s.indicators.charge_mark, s.device("hyperx").icon_set), (ChargeMark::BoltOutline, Some(IconSet::Ring)));
     }
 
     #[test]

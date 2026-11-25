@@ -13,8 +13,6 @@ use tauri::{AppHandle, Manager, State};
 #[serde(rename_all = "camelCase")]
 pub struct AppInfo {
     version: String,
-    config_path: String,
-    log_dir: String,
     /// `null` while unknown, `false` if the taskbar strip could not be embedded.
     strip_available: Option<bool>,
 }
@@ -35,8 +33,6 @@ pub fn get_state(app: AppHandle, state: State<'_, AppState>) -> FullState {
         settings: state.settings(),
         app: AppInfo {
             version: app.package_info().version.to_string(),
-            config_path: state.store.path().display().to_string(),
-            log_dir: state.log_dir.display().to_string(),
             strip_available: state.strip_available(),
         },
         initial_page: window::take_initial_page(),

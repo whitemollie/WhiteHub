@@ -8,7 +8,7 @@
 
 Без фирменных программ в фоне. Без драйверов. Без доступа в сеть.
 
-![Release](https://img.shields.io/badge/release-v0.2.3-0078D4?style=flat-square)
+![Release](https://img.shields.io/badge/release-v0.2.4-0078D4?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?style=flat-square)
 ![License](https://img.shields.io/badge/license-GPL--3.0-22C55E?style=flat-square)
 [![CI](https://github.com/whitemollie/WhiteHub/actions/workflows/ci.yml/badge.svg)](https://github.com/whitemollie/WhiteHub/actions/workflows/ci.yml)
@@ -33,7 +33,7 @@
 | **Всегда на виду** | Заряд рядом с часами, другие программы открывать не нужно |
 | **Зарядка** | Молния появляется, когда устройство подключено кабелем |
 | **Уведомления** | Низкий заряд, подключение и отключение, режим «Не беспокоить» |
-| **Оформление** | Тёмная и светлая темы, свои цвета, три вида значков |
+| **Оформление** | Тёмная и светлая темы, свои цвета, семь видов значков |
 | **Лёгкость** | Один фоновый процесс; окно загружается, только пока открыто |
 | **Приватность** | Без телеметрии, аккаунтов и сетевых запросов |
 

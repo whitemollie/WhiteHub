@@ -35,6 +35,42 @@ export function Segmented<T extends string | number>(props: {
   );
 }
 
+/** Choice shown as tiles with a preview above each label. */
+export function Tiles<T extends string>(props: {
+  value: T;
+  options: { value: T; label: string }[];
+  preview: (v: T) => JSX.Element;
+  onChange: (v: T) => void;
+  label: string;
+  columns: number;
+  /** Small tiles without visible labels. */
+  compact?: boolean;
+}) {
+  return (
+    <div class="tiles" classList={{ compact: props.compact }} style={{ "--columns": props.columns }} role="radiogroup" aria-label={props.label}>
+      <For each={props.options}>
+        {(o) => (
+          <button
+            type="button"
+            role="radio"
+            class="tile"
+            aria-checked={props.value === o.value}
+            aria-label={o.label}
+            title={props.compact ? o.label : undefined}
+            classList={{ active: props.value === o.value }}
+            onClick={() => props.onChange(o.value)}
+          >
+            <span class="tile-preview">{props.preview(o.value)}</span>
+            <Show when={!props.compact}>
+              <span class="tile-label">{o.label}</span>
+            </Show>
+          </button>
+        )}
+      </For>
+    </div>
+  );
+}
+
 /** A labelled settings row: title + optional hint on the left, control on the right. */
 export function Row(props: { title: string; hint?: string; stack?: boolean; children: JSX.Element }) {
   return (

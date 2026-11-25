@@ -2,8 +2,9 @@ import { For, Show } from "solid-js";
 import { api, type Colors, type Colorize, type IconSet, type IndicatorMode, type ThemeMode } from "../app/api";
 import { DEFAULTS } from "../app/format";
 import { state, updateSettings } from "../app/store";
-import { Button, ColorField, Row, Section, Segmented, Slider } from "../components/Controls";
+import { Button, ColorField, Row, Section, Segmented, Slider, Tiles } from "../components/Controls";
 import { DeviceGlyph } from "../components/DeviceCard";
+import { CHARGE_MARKS, ChargeIcon, ICON_SETS, StripIcon, StripPreview } from "../components/StripIcons";
 
 const MAX_ICON_BYTES = 384 * 1024;
 
@@ -21,8 +22,10 @@ export function Appearance() {
     updateSettings((s) => {
       s.appearance = d.appearance;
       s.indicators = d.indicators;
+      for (const device of Object.values(s.devices)) device.iconSet = null;
     }, 0);
   };
+  const knownDevices = () => state.devices.filter((d) => d.known && state.settings!.devices[d.id]);
   return (
     <div class="page">
       <header class="page-head">
@@ -53,6 +56,7 @@ export function Appearance() {
       </Section>
 
       <Section title="Taskbar indicator">
+        <StripPreview />
         <Row title="Style" hint="Strip next to the tray, or one tray icon per device.">
           <Segmented<IndicatorMode>
             label="Indicator style"
@@ -76,19 +80,57 @@ export function Appearance() {
             onChange={(v) => updateSettings((s) => (s.indicators.colorize = v), 0)}
           />
         </Row>
-        <Row title="Icons">
-          <Segmented<IconSet>
-            label="Icon set"
+        <Row stack title="Icon style">
+          <Tiles
+            label="Icon style"
+            columns={4}
             value={a().iconSet}
-            options={[
-              { value: "fluent", label: "Headphones" },
-              { value: "alternate", label: "Headset" },
-              { value: "text", label: "Letters" },
-            ]}
+            options={ICON_SETS}
+            preview={(v) => (
+              <Show when={v !== "hidden"} fallback={<span class="strip-value">61%</span>}>
+                <StripIcon set={v} kind="mouse" percent={61} />
+                <StripIcon set={v} kind="headset" percent={47} />
+              </Show>
+            )}
             onChange={(v) => updateSettings((s) => (s.appearance.iconSet = v), 0)}
           />
         </Row>
+        <Row stack title="Charging mark">
+          <Tiles
+            label="Charging mark"
+            columns={5}
+            value={ind().chargeMark}
+            options={CHARGE_MARKS}
+            preview={(v) => (
+              <>
+                <span class="strip-value">61%</span>
+                <ChargeIcon mark={v} />
+              </>
+            )}
+            onChange={(v) => updateSettings((s) => (s.indicators.chargeMark = v), 0)}
+          />
+        </Row>
       </Section>
+
+      <Show when={knownDevices().length > 0}>
+        <Section title="Icon per device">
+          <For each={knownDevices()}>
+            {(d) => (
+              <Row stack title={d.name}>
+                <Tiles<IconSet | "common">
+                  compact
+                  columns={8}
+                  label={`Icon of ${d.name}`}
+                  value={state.settings!.devices[d.id].iconSet ?? "common"}
+                  options={[{ value: "common", label: "Same as above" }, ...ICON_SETS.filter((o) => o.value !== "alternate" || d.kind === "headset")]}
+                  preview={(v) => (v === "common" ? <span class="tile-auto">Auto</span> : v === "hidden" ? <span class="strip-value">%</span> : <StripIcon set={v} kind={d.kind} percent={61} />)}
+                  onChange={(v) => updateSettings((s) => (s.devices[d.id].iconSet = v === "common" ? null : v), 0)}
+                />
+              </Row>
+            )}
+          </For>
+        </Section>
+      </Show>
 
       <Section title="Battery levels">
         <Row title="High from" hint="At or above this level the indicator is green.">
@@ -110,8 +152,8 @@ export function Appearance() {
         {color("textMuted", () => base().textMuted, "Secondary text")}
       </Section>
 
-      <Section title="Device icons">
-        <For each={state.devices.filter((d) => d.known && state.settings!.devices[d.id])}>
+      <Section title="Dashboard pictures">
+        <For each={knownDevices()}>
           {(d) => {
             const custom = () => state.settings!.devices[d.id]?.customIcon;
             const pick = (file: File | undefined) => {
@@ -122,7 +164,7 @@ export function Appearance() {
               r.readAsDataURL(file);
             };
             return (
-              <Row title={d.name} hint="PNG or SVG for the dashboard. The taskbar keeps the built-in icons for legibility.">
+              <Row title={d.name} hint="PNG or SVG for the dashboard. The taskbar uses the icons chosen above.">
                 <div class="icon-picker">
                   <span class="device-icon">
                     <DeviceGlyph device={d} size={20} />

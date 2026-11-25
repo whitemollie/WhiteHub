@@ -30,7 +30,8 @@ export interface Device {
 export type ThemeMode = "dark" | "light";
 export type IndicatorMode = "taskbar" | "tray";
 export type Colorize = "off" | "lowOnly" | "all";
-export type IconSet = "fluent" | "alternate" | "text";
+export type IconSet = "fluent" | "alternate" | "text" | "filled" | "battery" | "ring" | "hidden";
+export type ChargeMark = "bolt" | "boltOutline" | "plug" | "plus" | "hidden";
 
 export interface Colors {
   accent: string | null;
@@ -51,6 +52,7 @@ export interface DeviceSettings {
   lowThreshold: number;
   showInIndicator: boolean;
   customIcon: string | null;
+  iconSet: IconSet | null;
   kind: DeviceKind | null;
   known: { name: string; kind: DeviceKind } | null;
 }
@@ -68,7 +70,7 @@ export interface Settings {
     highThreshold: number;
     lowThreshold: number;
   };
-  indicators: { mode: IndicatorMode; colorize: Colorize };
+  indicators: { mode: IndicatorMode; colorize: Colorize; chargeMark: ChargeMark };
   notifications: { doNotDisturb: boolean; onConnect: boolean; onDisconnect: boolean; onLow: boolean };
   devices: Record<string, DeviceSettings>;
   ui: { lastPage: string };
@@ -76,8 +78,6 @@ export interface Settings {
 
 export interface AppInfo {
   version: string;
-  configPath: string;
-  logDir: string;
   stripAvailable: boolean | null;
 }
 
