@@ -1,6 +1,6 @@
 # Architecture
 
-How WhiteHub 0.2.4 is built. Reasons: [DECISIONS.md](DECISIONS.md). Device protocols: [PROTOCOLS.md](PROTOCOLS.md).
+How WhiteHub 0.2.5 is built. Reasons: [DECISIONS.md](DECISIONS.md). Device protocols: [PROTOCOLS.md](PROTOCOLS.md).
 
 One Windows process in Rust (Tauri 2). The user interface (SolidJS, TypeScript, Vite) runs in WebView2, which exists only while the window is open.
 

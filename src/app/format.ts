@@ -26,8 +26,8 @@ export function barPercent(d: Device): number | null {
 }
 
 export const DEFAULTS = {
-  dark: { accent: "#3b82f6", background: "#0a0a0a", card: "#111111", text: "#ededed", textMuted: "#a1a1a1" },
-  light: { accent: "#2563eb", background: "#ffffff", card: "#fafafa", text: "#0a0a0a", textMuted: "#666666" },
+  dark: { accent: "#ededed", background: "#0a0a0a", card: "#111111", text: "#ededed", textMuted: "#a1a1a1" },
+  light: { accent: "#0a0a0a", background: "#ffffff", card: "#fafafa", text: "#0a0a0a", textMuted: "#666666" },
   high: "#22c55e",
   mid: "#eab308",
   low: "#ef4444",

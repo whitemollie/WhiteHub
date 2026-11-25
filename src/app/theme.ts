@@ -11,6 +11,12 @@ function mix(a: string, b: string, t: number): string {
   return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(",")})`;
 }
 
+/** Black or white, whichever reads better on `hex`. */
+function contrast(hex: string): string {
+  const [r, g, b] = hexToRgb(hex);
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#0a0a0a" : "#ffffff";
+}
+
 /** Publishes the theme as CSS custom properties on <html>. */
 export function applyTheme(s: Settings) {
   const a = s.appearance;
@@ -18,6 +24,7 @@ export function applyTheme(s: Settings) {
   const c = a.colors;
   const bg = c.background ?? base.background;
   const text = c.text ?? base.text;
+  const accent = c.accent ?? base.accent;
   const [r, g, b] = hexToRgb(bg);
   const vars: Record<string, string> = {
     "--bg": `rgba(${r},${g},${b},${a.opacity})`,
@@ -29,7 +36,8 @@ export function applyTheme(s: Settings) {
     "--border-strong": mix(bg, text, a.mode === "dark" ? 0.24 : 0.18),
     "--hover": mix(bg, text, a.mode === "dark" ? 0.06 : 0.04),
     "--track": mix(bg, text, a.mode === "dark" ? 0.12 : 0.1),
-    "--accent": c.accent ?? base.accent,
+    "--accent": accent,
+    "--accent-fg": contrast(accent),
     "--high": c.high ?? DEFAULTS.high,
     "--mid": c.mid ?? DEFAULTS.mid,
     "--low": c.low ?? DEFAULTS.low,

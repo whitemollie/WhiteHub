@@ -1,5 +1,9 @@
 # What's new
 
+## 0.2.5 — 2026-11-25
+
+- Black and white accent instead of blue; calmer strip previews in the light theme
+
 ## 0.2.4 — 2026-11-25
 
 - Seven icon styles and five charging marks for the taskbar strip, with a preview; every device can have its own icon
