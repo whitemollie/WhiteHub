@@ -14,6 +14,8 @@
 //! answers the same query directly with CC = 1, while the receiver reports A0 (verified).
 //! Other WLmouse receivers on VID 36A7 use the same query according to the hub code and
 //! community tools, but only A860 has been tested.
+//!
+//! Written with the driver of ferloom/Wireless-Device-Battery-Monitor (GPL-3.0) as a reference.
 use super::{
     hex,
     provider::{clean_product, signature_of, Found, Outcome, Poll, Provider},

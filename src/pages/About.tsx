@@ -28,8 +28,10 @@ export function About() {
         <dd class="mono small">{state.app?.configPath}</dd>
         <dt>Logs</dt>
         <dd class="mono small">{state.app?.logDir}</dd>
+        <dt>Licence</dt>
+        <dd>GPL-3.0, no warranty. Source and licence text are in the project repository.</dd>
         <dt>Credits</dt>
-        <dd class="small">HyperX protocol documented by HyperX-Battery-Tray, hyperx-battery-logger and HyperHeadset (MIT).</dd>
+        <dd class="small">Protocols: BatteryHub by ferloom (GPL-3.0), HyperHeadset, hyperx-battery-logger and HyperX-Battery-Tray (MIT).</dd>
       </dl>
     </div>
   );

@@ -6,3 +6,7 @@ src-tauri/gen/
 release/
 # Diagnostics
 WhiteHub-diagnostics-*.txt
+# Working notes of the research phase
+docs/RESEARCH.md
+docs/FINAL_REPORT.md
+docs/research/

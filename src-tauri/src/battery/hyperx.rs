@@ -13,6 +13,8 @@
 //!                   0D 02 03 00 0C xx  headset on 1 / off 0
 //! ```
 //! Byte 3 = 01 marks a read ("GET") command; nothing is ever written to the headset.
+//!
+//! Written with the driver of ferloom/Wireless-Device-Battery-Monitor (GPL-3.0) as a reference.
 use super::{
     hex,
     provider::{clean_product, signature_of, EventSource, Found, Outcome, Poll, Provider},

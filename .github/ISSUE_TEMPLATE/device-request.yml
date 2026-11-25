@@ -1,0 +1,32 @@
+name: Device request
+description: Ask for support of a wireless device
+title: "Device: "
+labels: ["device"]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: Device model
+      placeholder: Vendor and exact model name
+    validations:
+      required: true
+  - type: input
+    id: usb
+    attributes:
+      label: USB ID of the receiver
+      description: "PowerShell: Get-PnpDevice -PresentOnly | Where-Object InstanceId -match 'VID_' | Select-Object FriendlyName, InstanceId. Only the VID and PID are needed. Leave out the last part of the ID, it can be a serial number."
+      placeholder: "VID_0000&PID_0000"
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection
+      options: ["2.4 GHz receiver", "Bluetooth", "Cable"]
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Which vendor program shows the battery? Can you test a build?

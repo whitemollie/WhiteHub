@@ -1,102 +1,65 @@
 # WhiteHub
 
-Лёгкая утилита для Windows 11 x64: показывает заряд беспроводной мыши и гарнитуры прямо на панели задач, слева от области уведомлений:
+Battery levels of wireless peripherals, right on the Windows 11 taskbar. [Русская версия](README.ru.md)
 
-```
-[🖱 82%] [🎧 64%]  ^  РУС  📶 🔊 🔋  12:00
-```
+WhiteHub reads the battery straight from the USB receivers through the standard Windows HID driver and shows it next to the notification area. It needs no vendor software, no extra drivers and no administrator rights, and it makes no network requests.
 
-Заряд читается напрямую с USB-приёмников через стандартный HID-драйвер Windows. Фирменное ПО (WL MOUSE HUB, HyperX NGENUITY), дополнительные драйверы и права администратора не нужны. Работает полностью локально: без телеметрии, аккаунтов и сетевых запросов.
+## Supported devices
 
-## Поддерживаемые устройства
+WhiteHub is **not universal**: every vendor uses its own protocol, and only these devices are supported today.
 
-| Устройство | Приёмник | Статус |
+| Device | USB receiver | Status |
 |---|---|---|
-| WLmouse Beast G | 2.4 GHz «8K receiver», USB `36A7:A860` | проверено на железе |
-| HyperX Cloud III S Wireless | 2.4 GHz донгл, USB `03F0:06BE` | проверено на железе |
-| HyperX Cloud III S Wireless (другая ревизия донгла) | `03F0:02CC` | по описанию протокола, не проверено |
-| Другие мыши WLmouse с тем же протоколом | VID `36A7` | обнаруживаются автоматически, не проверено |
+| WLmouse Beast G | `36A7:A860` (receiver), `36A7:A861` (cable) | Tested on hardware |
+| HyperX Cloud III **S** Wireless | `03F0:06BE` | Tested on hardware |
+| HyperX Cloud III S Wireless, other dongle | `03F0:02CC` | Untested |
+| Other WLmouse mice (USB vendor `36A7`) | — | Detected, untested; some models use a different protocol |
 
-HyperX Cloud III Wireless (без «S», `03F0:05B7`) использует другой протокол и не поддерживается.
+Other mice, headsets, keyboards and Bluetooth devices are not supported yet. Without a supported device WhiteHub starts and shows `--`. [Request a device](../../issues/new?template=device-request.yml).
 
-Особенность мыши: приёмник отдаёт заряд, только пока мышь не спит. Пока она спит, WhiteHub показывает последнее известное значение (приглушённо) и повторяет запрос через 30 с, 1, 2, 5 минут.
+## Features
 
-## Установка
+- Battery strip on the taskbar, with tray icons as a fallback
+- Charging indicator, low-battery and connection notifications
+- Dark and light themes with custom colours
+- Polling every 5 to 60 minutes, optional start with Windows
+- Small footprint: one process and about 3 MB of private memory in the background; the window (WebView2) is loaded only while it is open
 
-1. Запустите `WhiteHub_0.1.7_x64-setup.exe` (`release/`). Установка идёт для текущего пользователя, права администратора не нужны.
-2. После установки WhiteHub запустится и откроет окно. Полоска с зарядом появится на панели задач.
-3. Иконка WhiteHub (батарейка) поначалу может прятаться под `^`. Чтобы она была всегда видна: *Параметры → Персонализация → Панель задач → Другие значки в системном трее → WhiteHub*. Это нужно для меню (правый клик); сама полоска с зарядом видна и без этого.
+## Install
 
-Удаление: *Параметры → Приложения → WhiteHub → Удалить*. Деинсталлятор предлагает галочку удаления данных приложения (настройки и логи) и всегда убирает запись автозапуска.
+Requires Windows 11 x64.
 
-## Использование
+1. Download `WhiteHub_x.y.z_x64-setup.exe` from [Releases](../../releases).
+2. Run it. It installs for the current user only. The installer is not code-signed, so SmartScreen may warn about an unknown publisher.
+3. To keep the WhiteHub tray icon visible: *Settings → Personalization → Taskbar → Other system tray icons*.
 
-- **Клик по полоске или по иконке WhiteHub** открывает окно над областью уведомлений. Крестик или `Esc` закрывают окно; мониторинг и индикаторы продолжают работать.
-- **Правый клик по иконке WhiteHub**: Open, Settings, Devices, Exit. Exit полностью завершает приложение.
-- Наведение на полоску показывает подсказку: устройство, заряд, время обновления, статус.
-- `whitehub.exe --page devices` открывает окно на нужной странице (`dashboard`, `devices`, `appearance`, `settings`, `about`).
+To uninstall: *Settings → Apps → WhiteHub*. The uninstaller asks whether to delete settings and logs.
 
-Страницы окна:
-- **Dashboard** — карточки устройств: заряд, статус, время обновления, источник данных.
-- **Devices** — включение и отключение мониторинга, подробности о приёмнике, ручное обновление, оповещение о низком заряде с порогом, отображаемое имя, ручная привязка к USB Product ID.
-- **Appearance** — тёмная или светлая тема, прозрачность окна (акрил), стиль индикатора (полоска на панели задач или иконки в трее), раскраска уровней, набор значков, пороги и цвета уровней, цвета интерфейса, свои картинки устройств для окна.
-- **Settings** — интервал опроса (5/10/15/30/60 мин), автозапуск, уведомления и «Не беспокоить», режим отладки, экспорт диагностики.
+## Good to know
 
-## Конфигурация
+- **A sleeping mouse does not report its battery.** WhiteHub keeps showing the last known value, dimmed, and retries.
+- **The taskbar strip is not an official Windows feature.** It is a window placed inside the taskbar. If a Windows update breaks that, WhiteHub switches to tray icons.
+- Only the primary taskbar is used. Sleep/hibernation, multiple monitors and a light taskbar have not been tested.
 
-- Настройки: `%APPDATA%\com.whitehub.desktop\settings.json`. Пустой, повреждённый или устаревший файл не роняет приложение: недостающие поля получают значения по умолчанию, недопустимые исправляются, а нечитаемый файл сохраняется как `settings.json.bad`.
-- Логи: `%LOCALAPPDATA%\com.whitehub.desktop\logs\whitehub.log`, ротация на 512 КБ, хранится один архив.
-- Автозапуск: значение `WhiteHub` в `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, только для текущего пользователя.
+## Privacy and security
 
-## Как это устроено
+No telemetry, accounts or network access. WhiteHub sends only read-only battery queries, and only to the HyperX dongles listed above and to USB devices of the vendor WLmouse (`36A7`). Settings live in `%APPDATA%\com.whitehub.desktop`, logs in `%LOCALAPPDATA%\com.whitehub.desktop`. To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
-```
-src-tauri/src/
-  app.rs            жизненный цикл, связывание подсистем, применение настроек
-  battery/
-    provider.rs     общий интерфейс провайдера (Provider, Poll, Outcome)
-    manager.rs      поток опроса: расписание, повторы с backoff, события подключения и низкого заряда
-    wlmouse.rs      WLmouse: feature report 0x83 (как в официальном WL MOUSE HUB)
-    hyperx.rs       HyperX Cloud III S: output/input report 0x0C, команда 0x06
-  shell/
-    mod.rs          поток оболочки: полоска в панели задач, системные события (USB, сон, тема, перезапуск Explorer)
-    render.rs       отрисовка полоски и иконок трея (ab_glyph + системные шрифты через memory map)
-  indicators.rs     снимки устройств -> содержимое полоски и иконок трея
-  tray.rs           иконка WhiteHub и запасные иконки уровней
-  window.rs         всплывающее окно: создаётся по требованию и уничтожается при закрытии
-  notifications.rs  уведомления Windows с правилами и «Не беспокоить»
-  settings.rs       JSON-конфигурация, валидация, атомарная запись
-  autostart.rs      автозапуск через HKCU\...\Run
-  logging.rs        файловый лог с ротацией
-  commands.rs       IPC-команды для интерфейса
-src/                интерфейс на SolidJS + TypeScript + CSS
-```
+## Build
 
-Ключевые решения:
-- **Окно одного размера на всех вкладках** (640×560), длинные вкладки прокручиваются. Показывается только после первой отрисовки (до этого скрыто через DWM), поэтому при открытии нет вспышек.
-- **Окно не держится в памяти.** WebView2 (около 150 МБ, 6–7 процессов) создаётся только при открытии окна и уничтожается при закрытии. В фоне работает один процесс без WebView.
-- **Полоска на панели задач** — собственное layered-окно, встроенное в `Shell_TrayWnd`. Поток, который её рисует, никогда не блокируется: весь ввод-вывод HID идёт в отдельном потоке менеджера. После перезапуска Explorer полоска встраивается заново. Если встроить её не удалось, автоматически включаются иконки в трее.
-- **Без активного ожидания.** Поток менеджера спит в `recv_timeout` до следующего опроса. Подключение приёмников, выход из сна и смена темы приходят как системные сообщения, а не через опрос.
-- **Устройства изолированы.** Каждый опрос обёрнут в `catch_unwind`. Ошибка или зависание одного провайдера отражается только на его карточке.
-- **Значения не выдумываются.** Без ответа устройства показывается последнее известное значение с пометкой или `--`.
-
-Протоколы и проверка на железе описаны в [docs/RESEARCH.md](docs/RESEARCH.md).
-
-## Разработка
-
-Нужны: Rust (stable, MSVC), Node.js 20+, WebView2 Runtime (есть в Windows 11).
+Requires Rust (stable, MSVC) and Node.js 22+.
 
 ```powershell
-npm install
-npm run tauri dev          # режим разработки
-cd src-tauri; cargo test   # unit-тесты бэкенда
-npm run tauri build        # релизная сборка + NSIS-установщик
+npm ci
+npm run tauri dev                      # development
+cargo test --manifest-path src-tauri/Cargo.toml
+npm run tauri build                    # release build and installer
 ```
 
-Замер ресурсов установленной или собранной версии:
+Device protocols: [docs/PROTOCOLS.md](docs/PROTOCOLS.md). To add a device, implement `battery::provider::Provider`, register it in `app.rs` and add its ID to `settings::DEVICE_IDS`.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\measure.ps1
-```
+## Licence
 
-Добавить новое устройство: реализуйте `battery::provider::Provider` в новом модуле, добавьте его в список провайдеров в `app.rs::setup` и его ID в `settings::DEVICE_IDS`. Интерфейс подхватит устройство автоматически.
+[GPL-3.0](LICENSE), © 2026 whitemollie. Protocol sources and credits: [CREDITS.md](CREDITS.md).
+
+WhiteHub is an independent project. It is not affiliated with or endorsed by WLmouse, HyperX or HP.
