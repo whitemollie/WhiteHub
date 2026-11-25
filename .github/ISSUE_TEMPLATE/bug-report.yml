@@ -1,0 +1,29 @@
+name: Bug report
+description: Something does not work
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: WhiteHub version
+      description: Shown on the About page.
+      placeholder: 0.1.9
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      placeholder: HyperX Cloud III S Wireless
+  - type: textarea
+    id: report
+    attributes:
+      label: Diagnostic report
+      description: "Settings → Export report. Read it before attaching: it contains device names, settings and the log."

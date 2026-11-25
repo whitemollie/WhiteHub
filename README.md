@@ -1,56 +1,127 @@
+<div align="center">
+
+<img src="assets/app-icon.svg" width="112" alt="WhiteHub logo">
+
 # WhiteHub
 
-Battery levels of wireless peripherals, right on the Windows 11 taskbar. [Русская версия](README.ru.md)
+**Battery levels of your wireless gear, right on the Windows 11 taskbar.**
 
-WhiteHub reads the battery straight from the USB receivers through the standard Windows HID driver and shows it next to the notification area. It needs no vendor software, no extra drivers and no administrator rights, and it makes no network requests.
+No vendor apps in the background. No drivers. No network access.
 
-## Supported devices
+![Release](https://img.shields.io/badge/release-v0.1.9-0078D4?style=flat-square)
+![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?style=flat-square)
+![License](https://img.shields.io/badge/license-GPL--3.0-22C55E?style=flat-square)
+[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+<br>
+![Rust](https://img.shields.io/badge/Rust-stable-CE422B?style=flat-square&logo=rust&logoColor=white)
+![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
+![SolidJS](https://img.shields.io/badge/SolidJS-1.9-2C4F7C?style=flat-square&logo=solid&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript&logoColor=white)
 
-WhiteHub is **not universal**: every vendor uses its own protocol, and only these devices are supported today.
+**English** | [Русский](README.ru.md)
+
+### [⬇️ Download for Windows](../../releases) · [What's new](CHANGELOG.md) · [Report an issue](../../issues/new/choose)
+
+[Highlights](#highlights) · [Preview](#preview) · [Quick start](#quick-start) · [Devices](#devices) · [FAQ](#faq) · [Privacy](#privacy)
+
+<br>
+
+<img src="assets/screenshots/strip.png" width="430" alt="Battery strip on the taskbar">
+
+</div>
+
+## Highlights
+
+| | |
+|---|---|
+| 🔋 **Always in sight** | Battery levels sit next to the clock, so you never have to open another app |
+| ⚡ **Charging status** | A bolt appears when a device is on its cable |
+| 🔔 **Timely alerts** | Low battery, connected and disconnected, with do not disturb |
+| 🎨 **Your look** | Dark and light themes, custom colours, three icon styles |
+| 🪶 **Lightweight** | One background process; the window is loaded only while it is open |
+| 🔒 **Private** | No telemetry, accounts or network requests |
+
+## Preview
+
+<div align="center">
+
+| Dashboard | Light theme |
+|:---:|:---:|
+| <img src="assets/screenshots/dashboard.png" width="400" alt="Dashboard"> | <img src="assets/screenshots/dashboard-light.png" width="400" alt="Dashboard in the light theme"> |
+| **Devices** | **Appearance** |
+| <img src="assets/screenshots/devices.png" width="400" alt="Devices page"> | <img src="assets/screenshots/appearance.png" width="400" alt="Appearance page"> |
+
+</div>
+
+## Quick start
+
+1. Download `WhiteHub_x.y.z_x64-setup.exe` from [Releases](../../releases).
+2. Run it. It installs for your user only and needs no administrator rights.
+3. Plug in a [supported device](#devices). The battery appears on the taskbar.
+
+> [!NOTE]
+> The installer is not code-signed, so Windows SmartScreen may warn about an unknown publisher.
+
+## Devices
 
 | Device | USB receiver | Status |
 |---|---|---|
-| WLmouse Beast G | `36A7:A860` (receiver), `36A7:A861` (cable) | Tested on hardware |
-| HyperX Cloud III **S** Wireless | `03F0:06BE` | Tested on hardware |
-| HyperX Cloud III S Wireless, other dongle | `03F0:02CC` | Untested |
-| Other WLmouse mice (USB vendor `36A7`) | product ID entered by hand | Untested; some models use a different protocol |
+| WLmouse Beast G | `36A7:A860`, cable `36A7:A861` | ✅ Tested |
+| HyperX Cloud III **S** Wireless | `03F0:06BE` | ✅ Tested |
+| HyperX Cloud III S Wireless, other dongle | `03F0:02CC` | ⚪ Untested |
+| Other WLmouse mice | Product ID entered by hand | ⚪ Untested |
 
-Other mice, headsets, keyboards and Bluetooth devices are not supported yet. Without a supported device WhiteHub starts and shows `--`. [Request a device](../../issues/new?template=device-request.yml).
+> [!IMPORTANT]
+> WhiteHub is not universal: every vendor uses its own protocol. Other mice, headsets, keyboards and Bluetooth devices are not supported yet. Missing yours? [Request a device](../../issues/new?template=device-request.yml).
 
-## Features
+## FAQ
 
-- Battery strip on the taskbar, with tray icons as a fallback
-- Charging indicator, low-battery and connection notifications
-- Dark and light themes with custom colours
-- Polling every 5 to 60 minutes, optional start with Windows
-- Small footprint: one background process, about 7 MB of private memory once the window has been used; the window itself (WebView2) is loaded only while it is open
+<details>
+<summary><b>Why does my mouse show an old value?</b></summary>
 
-## Install
+A sleeping mouse does not report its battery. WhiteHub shows the last known value dimmed and tries again. Move the mouse and press **Refresh now**.
+</details>
 
-Requires Windows 11 x64.
+<details>
+<summary><b>The WhiteHub tray icon is hidden. Where is it?</b></summary>
 
-1. Download `WhiteHub_x.y.z_x64-setup.exe` from [Releases](../../releases).
-2. Run it. It installs for the current user only. The installer is not code-signed, so SmartScreen may warn about an unknown publisher.
-3. To keep the WhiteHub tray icon visible: *Settings → Personalization → Taskbar → Other system tray icons*.
+Windows hides new icons under `^`. Turn it on in *Settings → Personalization → Taskbar → Other system tray icons*.
+</details>
 
-To uninstall: *Settings → Apps → WhiteHub*. The uninstaller asks whether to delete settings and logs.
+<details>
+<summary><b>Is the taskbar strip an official Windows feature?</b></summary>
 
-## Good to know
+No. It is a small window placed inside the taskbar. If a Windows update breaks that, WhiteHub switches to tray icons.
+</details>
 
-- **A sleeping mouse does not report its battery.** WhiteHub keeps showing the last known value, dimmed, and retries.
-- **The taskbar strip is not an official Windows feature.** It is a window placed inside the taskbar. If a Windows update breaks that, WhiteHub switches to tray icons.
-- Only the primary taskbar is used. Sleep/hibernation, multiple monitors and a light taskbar have not been tested.
+<details>
+<summary><b>What has not been tested?</b></summary>
 
-## Privacy and security
+Sleep and hibernation, several monitors, a light taskbar and an auto-hiding taskbar. Only the primary taskbar is used.
+</details>
 
-No telemetry, accounts or network access. WhiteHub sends only read-only battery queries, and only to the USB devices listed above or to one you choose by its product ID. Settings live in `%APPDATA%\com.whitehub.desktop`, logs in `%LOCALAPPDATA%\com.whitehub.desktop`. To report a vulnerability, see [SECURITY.md](SECURITY.md).
+<details>
+<summary><b>How much memory does it use?</b></summary>
+
+About 7 MB of private memory in the background once the window has been used (measured with 0.1.7). While the window is open, WebView2 adds about 165 MB (measured with 0.1.0).
+</details>
+
+<details>
+<summary><b>How do I uninstall it?</b></summary>
+
+*Settings → Apps → WhiteHub*. The uninstaller asks whether to delete settings and logs.
+</details>
+
+## Privacy
+
+WhiteHub sends only read-only battery queries, and only to the USB devices listed above or to one you choose by its product ID. Settings live in `%APPDATA%\com.whitehub.desktop`, logs in `%LOCALAPPDATA%\com.whitehub.desktop`. Vulnerabilities: [SECURITY.md](SECURITY.md).
 
 ## For developers
 
-Users only need the installer. Building from source and adding devices: [CONTRIBUTING.md](CONTRIBUTING.md).
+Users only need the installer. Building from source and adding devices: [CONTRIBUTING.md](CONTRIBUTING.md). Device protocols: [docs/PROTOCOLS.md](docs/PROTOCOLS.md).
 
 ## Licence
 
 [GPL-3.0](LICENSE), © 2026 whitemollie. Protocol sources and credits: [CREDITS.md](CREDITS.md).
 
-WhiteHub is an independent project. It is not affiliated with or endorsed by WLmouse, HyperX or HP.
+<sub>WhiteHub is an independent project. It is not affiliated with or endorsed by WLmouse, HyperX or HP.</sub>

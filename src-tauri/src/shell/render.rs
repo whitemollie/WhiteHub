@@ -438,7 +438,8 @@ mod tests {
             StripItem { glyph: Some(GLYPH_MOUSE), label: "M".into(), text: "58%".into(), color: None, dim: false, charging: false, tooltip: String::new() },
             StripItem { glyph: Some(GLYPH_HEADPHONE), label: "H".into(), text: "45%".into(), color: None, dim: false, charging: true, tooltip: String::new() },
         ];
-        let r = render_strip(&items, 72, 1.5, [255, 255, 255]).unwrap();
+        let scale: f32 = std::env::var("WHITEHUB_PREVIEW_SCALE").ok().and_then(|v| v.parse().ok()).unwrap_or(1.5);
+        let r = render_strip(&items, (48.0 * scale) as u32, scale, [255, 255, 255]).unwrap();
         let mut bmp = Vec::new();
         let size = 54 + r.w * r.h * 4;
         bmp.extend_from_slice(b"BM");
