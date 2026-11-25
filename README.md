@@ -20,7 +20,7 @@ No vendor apps in the background. No drivers. No network access.
 
 **English** | [Русский](README.ru.md)
 
-### [⬇️ Download for Windows](../../releases) · [What's new](CHANGELOG.md) · [Report an issue](../../issues/new/choose)
+### [Download for Windows](../../releases) · [What's new](CHANGELOG.md) · [Report an issue](../../issues/new/choose)
 
 [Highlights](#highlights) · [Preview](#preview) · [Quick start](#quick-start) · [Devices](#devices) · [FAQ](#faq) · [Privacy](#privacy)
 
@@ -32,14 +32,14 @@ No vendor apps in the background. No drivers. No network access.
 
 ## Highlights
 
-| | |
+| Feature | What you get |
 |---|---|
-| 🔋 **Always in sight** | Battery levels sit next to the clock, so you never have to open another app |
-| ⚡ **Charging status** | A bolt appears when a device is on its cable |
-| 🔔 **Timely alerts** | Low battery, connected and disconnected, with do not disturb |
-| 🎨 **Your look** | Dark and light themes, custom colours, three icon styles |
-| 🪶 **Lightweight** | One background process; the window is loaded only while it is open |
-| 🔒 **Private** | No telemetry, accounts or network requests |
+| **Always in sight** | Battery levels sit next to the clock, so you never have to open another app |
+| **Charging status** | A bolt appears when a device is on its cable |
+| **Timely alerts** | Low battery, connected and disconnected, with do not disturb |
+| **Your look** | Dark and light themes, custom colours, three icon styles |
+| **Lightweight** | One background process; the window is loaded only while it is open |
+| **Private** | No telemetry, accounts or network requests |
 
 ## Preview
 
@@ -66,10 +66,10 @@ No vendor apps in the background. No drivers. No network access.
 
 | Device | USB receiver | Status |
 |---|---|---|
-| WLmouse Beast G | `36A7:A860`, cable `36A7:A861` | ✅ Tested |
-| HyperX Cloud III **S** Wireless | `03F0:06BE` | ✅ Tested |
-| HyperX Cloud III S Wireless, other dongle | `03F0:02CC` | ⚪ Untested |
-| Other WLmouse mice | Product ID entered by hand | ⚪ Untested |
+| WLmouse Beast G | `36A7:A860`, cable `36A7:A861` | Tested |
+| HyperX Cloud III **S** Wireless | `03F0:06BE` | Tested |
+| HyperX Cloud III S Wireless, other dongle | `03F0:02CC` | Untested |
+| Other WLmouse mice | Product ID entered by hand | Untested |
 
 > [!IMPORTANT]
 > WhiteHub is not universal: every vendor uses its own protocol. Other mice, headsets, keyboards and Bluetooth devices are not supported yet. Missing yours? [Request a device](../../issues/new?template=device-request.yml).
