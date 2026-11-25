@@ -7,10 +7,10 @@ use crate::{
         manager::{Cmd, Manager},
         wlmouse::WlMouse,
         xinput::XInput,
-        DeviceSnapshot,
+        DeviceKind, DeviceSnapshot,
     },
     commands, indicators, logging, notifications,
-    settings::{IndicatorMode, KnownDevice, Settings, Store},
+    settings::{DeviceSettings, IndicatorMode, KnownDevice, Settings, Store},
     shell::{self, Shell, ShellEvent, StripModel},
     tray::{self, TrayState},
     window,
@@ -190,13 +190,23 @@ fn on_devices(app: &AppHandle, snaps: &[DeviceSnapshot], events: Vec<crate::batt
     refresh_indicators_with(app, &settings, snaps);
 }
 
+/// What to remember about a device: its own name and detected type, not the user's choices.
+fn remembered(cfg: &DeviceSettings, name: &str, shown_kind: DeviceKind) -> KnownDevice {
+    // With a type chosen by the user, that one is shown; keep the detected type.
+    let kind = match (&cfg.kind, &cfg.known) {
+        (Some(_), Some(known)) => known.kind,
+        _ => shown_kind,
+    };
+    KnownDevice { name: name.to_owned(), kind }
+}
+
 /// Stores the name and type of devices seen for the first time (or renamed).
 fn remember_devices(app: &AppHandle, state: &AppState, snaps: &[DeviceSnapshot]) {
     let Ok(mut settings) = state.settings.lock() else { return };
     let mut changed = false;
     for s in snaps.iter().filter(|s| s.known) {
-        let known = Some(KnownDevice { name: s.default_name.clone(), kind: s.kind });
         let d = settings.devices.entry(s.id.clone()).or_default();
+        let known = Some(remembered(d, &s.default_name, s.kind));
         if d.known != known {
             d.known = known;
             changed = true;
@@ -300,4 +310,19 @@ fn trim_memory_later(after: Duration) {
             SetProcessWorkingSetSize(GetCurrentProcess(), usize::MAX, usize::MAX);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detected_type_survives_the_users_choice() {
+        let mut cfg = DeviceSettings::default();
+        assert_eq!(remembered(&cfg, "Pad", DeviceKind::Gamepad).kind, DeviceKind::Gamepad);
+        cfg.known = Some(KnownDevice { name: "Pad".into(), kind: DeviceKind::Gamepad });
+        cfg.kind = Some(DeviceKind::Keyboard);
+        let known = remembered(&cfg, "New name", DeviceKind::Keyboard);
+        assert_eq!((known.kind, known.name.as_str()), (DeviceKind::Gamepad, "New name"));
+    }
 }

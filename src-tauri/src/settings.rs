@@ -211,10 +211,9 @@ impl Settings {
             self.poll_interval_minutes = 5;
         }
         let a = &mut self.appearance;
-        if !(0.6..=1.0).contains(&a.opacity) || a.opacity.is_nan() {
+        if !(0.6..=1.0).contains(&a.opacity) {
             fixes.push(format!("opacity {} out of range", a.opacity));
-            a.opacity = a.opacity.clamp(0.6, 1.0);
-            if a.opacity.is_nan() { a.opacity = 1.0; }
+            a.opacity = if a.opacity.is_nan() { 1.0 } else { a.opacity.clamp(0.6, 1.0) };
         }
         if a.low_threshold >= a.high_threshold || a.high_threshold > 100 || a.low_threshold < 1 {
             fixes.push("colour thresholds reset to 30/70".into());

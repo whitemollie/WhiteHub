@@ -1,6 +1,5 @@
 //! Small file logger for the `log` facade: one file, rotated to `.1` at 512 KiB.
-//! Info level by default, debug level in Debug Mode. Writes are unbuffered appends; the app
-//! logs a handful of lines per poll, so this costs nothing measurable.
+//! Info level by default, debug level when the user turns debug logging on.
 use std::{
     fs::{self, File, OpenOptions},
     io::Write,

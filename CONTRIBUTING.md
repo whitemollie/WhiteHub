@@ -13,6 +13,8 @@ cargo test --manifest-path src-tauri/Cargo.toml
 npm run tauri build                                # release build and installer
 ```
 
+Release builds are made with `RUSTFLAGS="--remap-path-prefix=$env:USERPROFILE\.cargo=cargo"`, so that they contain no local folder names.
+
 ## Add a device
 
 Protocols of the supported devices: [docs/PROTOCOLS.md](docs/PROTOCOLS.md).

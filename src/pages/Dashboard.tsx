@@ -38,10 +38,27 @@ export function Dashboard() {
 function EmptyState() {
   return (
     <div class="empty">
-      <p>{state.devices.some((d) => d.known) ? "All devices are disabled." : "No supported device found yet. Connect one, it appears by itself."}</p>
-      <button type="button" class="link" onClick={() => navigate("devices")}>
-        Manage devices
-      </button>
+      <Show
+        when={!state.devices.some((d) => d.known)}
+        fallback={
+          <>
+            <p>All devices are disabled.</p>
+            <button type="button" class="link" onClick={() => navigate("devices")}>
+              Manage devices
+            </button>
+          </>
+        }
+      >
+        <p>No device found yet. Connect one, it appears by itself:</p>
+        <ul class="empty-list">
+          <li>Bluetooth: any device whose battery Windows shows</li>
+          <li>2.4 GHz dongle: WLmouse Beast G, HyperX Cloud III S Wireless</li>
+          <li>Xbox wireless controllers</li>
+        </ul>
+        <button type="button" class="link" onClick={() => navigate("devices")}>
+          My device is missing
+        </button>
+      </Show>
     </div>
   );
 }

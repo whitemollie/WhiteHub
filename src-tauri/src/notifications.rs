@@ -11,7 +11,7 @@ pub fn compose(rules: &Notifications, e: &Event) -> Option<(String, String)> {
     match e {
         Event::Connected { name, .. } if rules.on_connect => Some((format!("{name} connected"), "Battery monitoring resumed.".into())),
         Event::Disconnected { name, .. } if rules.on_disconnect => {
-            Some((format!("{name} disconnected"), "The last known battery level stays visible.".into()))
+            Some((format!("{name} disconnected"), "Its last battery level stays in the WhiteHub window.".into()))
         }
         Event::Low { name, level, .. } if rules.on_low => Some((format!("{name}: battery low"), format!("Battery level: {level}. Time to charge."))),
         _ => None,

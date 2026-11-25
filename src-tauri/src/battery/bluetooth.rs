@@ -8,6 +8,7 @@ use super::{
     scanner::{Reading, Scanned, Scanner},
     DeviceKind,
 };
+use crate::system::wide;
 use std::collections::{BTreeMap, HashSet};
 use windows_sys::{
     core::GUID,
@@ -44,10 +45,6 @@ struct Node {
     connected: Option<bool>,
     battery: Option<u8>,
     class_of_device: Option<u32>,
-}
-
-fn wide(s: &str) -> Vec<u16> {
-    s.encode_utf16().chain(Some(0)).collect()
 }
 
 fn instance_ids(filter: &str, flags: u32) -> Vec<String> {

@@ -15,8 +15,12 @@ pub fn windows_dir() -> PathBuf {
     PathBuf::from(String::from_utf16_lossy(&buf[..n]))
 }
 
+/// Null-terminated UTF-16, as Windows functions expect it.
+pub fn wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(Some(0)).collect()
+}
+
 pub fn windows_build() -> String {
-    let wide = |s: &str| s.encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
     let (key, name) = (wide(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion"), wide("CurrentBuildNumber"));
     let mut buf = [0u16; 32];
     let mut size = std::mem::size_of_val(&buf) as u32;

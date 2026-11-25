@@ -1,5 +1,12 @@
 # What's new
 
+## 0.2.3 — 2026-11-25
+
+- The empty dashboard and "My device is missing" explain which devices appear
+- The product ID of another WLmouse mouse can be entered before one was ever found
+- A device type set back to automatic is right even while the device is away
+- The program no longer contains folder names of the build computer
+
 ## 0.2.2 — 2026-11-25
 
 - The tray icon is now the WhiteHub logo

@@ -1,7 +1,6 @@
 //! WLmouse Beast G over its 2.4 GHz "8K" receiver (USB 36A7:A860).
 //!
-//! Protocol (read-only status query), byte-for-byte as sent by the official WL MOUSE HUB web app
-//! (`getBatPer` in gm.wlmouse.gg) and verified on hardware:
+//! Protocol, the same read-only query as in the vendor's web app (`getBatPer` in gm.wlmouse.gg):
 //!
 //! ```text
 //! SET feature report 0 (65 bytes): 00 | 00 00 02 02 00 83 00 …
@@ -11,7 +10,7 @@
 //! ```
 //! The receiver relays the query to the mouse; a sleeping mouse never answers, so `A0` persists.
 //! With the charging cable attached, the mouse enumerates as its own USB device (36A7:A861) and
-//! answers the same query directly with CC = 1, while the receiver reports A0 (verified).
+//! answers the same query directly with CC = 1, while the receiver reports A0.
 //! Only these two tested devices are queried automatically: the vendor ID is shared with other
 //! products (including keyboards), for which the command may mean something else. Another
 //! receiver can be selected by its product ID in the settings.
@@ -46,19 +45,18 @@ pub enum Reply {
 
 /// Decodes a feature report with or without the leading report-ID byte.
 pub fn decode(r: &[u8]) -> Reply {
-    let (st, sub, cmd, chg, lvl) = if r.len() >= 9 && r[0] == 0x00 && r[4] == 0x02 && r[6] == CMD_BATTERY {
-        (r[1], r[4], r[6], r[7], r[8])
+    let (status, charge, percent) = if r.len() >= 9 && r[0] == 0x00 && r[4] == 0x02 && r[6] == CMD_BATTERY {
+        (r[1], r[7], r[8])
     } else if r.len() >= 8 && r[3] == 0x02 && r[5] == CMD_BATTERY {
-        (r[0], r[3], r[5], r[6], r[7])
+        (r[0], r[6], r[7])
     } else {
         return Reply::Foreign;
     };
-    debug_assert!(sub == 0x02 && cmd == CMD_BATTERY);
-    match st {
-        ST_READY if lvl > 100 => Reply::Foreign,
+    match status {
+        ST_READY if percent > 100 => Reply::Foreign,
         // Level 0 while not charging is what the receiver reports for an unlinked mouse.
-        ST_READY if lvl == 0 && chg == 0 => Reply::Pending,
-        ST_READY => Reply::Battery { percent: lvl, charging: chg == 0x01 },
+        ST_READY if percent == 0 && charge == 0 => Reply::Pending,
+        ST_READY => Reply::Battery { percent, charging: charge == 0x01 },
         // 0x00 = our request not processed yet; A0 = receiver waiting for the mouse.
         s if s != 0 && s < ST_READY => Reply::Pending,
         _ => Reply::Foreign,
@@ -137,7 +135,7 @@ impl Provider for WlMouse {
 
     /// Asks every matching collection. With the charging cable attached the mouse appears as its
     /// own USB device and answers directly (with the charging flag set), while the receiver only
-    /// reports "waiting" — so a real reading from any collection wins over "asleep".
+    /// reports "waiting". A real reading from any collection therefore wins over "asleep".
     fn poll(&mut self, api: &HidApi) -> Poll {
         let mut candidates: Vec<_> = api
             .device_list()

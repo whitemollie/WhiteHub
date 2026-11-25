@@ -8,7 +8,7 @@
 
 No vendor apps in the background. No drivers. No network access.
 
-![Release](https://img.shields.io/badge/release-v0.2.2-0078D4?style=flat-square)
+![Release](https://img.shields.io/badge/release-v0.2.3-0078D4?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?style=flat-square)
 ![License](https://img.shields.io/badge/license-GPL--3.0-22C55E?style=flat-square)
 [![CI](https://github.com/whitemollie/WhiteHub/actions/workflows/ci.yml/badge.svg)](https://github.com/whitemollie/WhiteHub/actions/workflows/ci.yml)
@@ -17,7 +17,7 @@ No vendor apps in the background. No drivers. No network access.
 
 ### [Download for Windows](../../releases) · [What's new](CHANGELOG.md) · [Report an issue](../../issues/new/choose)
 
-[Highlights](#highlights) · [Preview](#preview) · [Quick start](#quick-start) · [Devices](#devices) · [FAQ](#faq) · [Privacy](#privacy)
+[Highlights](#highlights) · [Preview](#preview) · [Quick start](#quick-start) · [Find your device](#find-your-device) · [Devices](#devices) · [FAQ](#faq) · [Privacy](#privacy)
 
 <br>
 
@@ -58,6 +58,18 @@ No vendor apps in the background. No drivers. No network access.
 > [!NOTE]
 > The installer is not code-signed, so Windows SmartScreen may warn about an unknown publisher.
 
+## Find your device
+
+There is nothing to search for or add: WhiteHub looks by itself, when it starts and whenever something is connected.
+
+| Your device | What to do |
+|---|---|
+| Bluetooth | Connect it in Windows. If *Settings → Bluetooth & devices* shows its battery, WhiteHub shows it too |
+| 2.4 GHz dongle of a supported model | Plug in the dongle and switch the device on |
+| 2.4 GHz dongle of another model | Not supported yet: press **Devices → My device is missing → Create file** and [request it](../../issues/new?template=device-request.yml) |
+| Another WLmouse mouse | Enter its product ID under **Devices → My device is missing** (untested) |
+| Xbox controller | Connect it wirelessly and switch it on |
+
 ## Devices
 
 | Device | Connection | Status |
@@ -70,7 +82,7 @@ No vendor apps in the background. No drivers. No network access.
 | Other WLmouse mice | Product ID entered by hand | Untested |
 
 > [!IMPORTANT]
-> Devices on their own 2.4 GHz dongle need support for that model, because every vendor uses its own protocol. Missing yours? Press **Devices → My device is missing → Create file** and [request it](../../issues/new?template=device-request.yml).
+> Devices on their own 2.4 GHz dongle need support for that model, because every vendor uses its own protocol.
 
 ## FAQ
 

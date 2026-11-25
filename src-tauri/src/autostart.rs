@@ -1,5 +1,6 @@
-//! Start with Windows via the per-user Run key (no administrator rights, removed by the
-//! uninstaller hook). Deliberately not machine-wide.
+//! Start with Windows through the Run key of the current user, which needs no administrator rights.
+//! The uninstaller removes the entry.
+use crate::system::wide;
 use windows_sys::Win32::{
     Foundation::ERROR_SUCCESS,
     System::Registry::{RegDeleteKeyValueW, RegGetValueW, RegSetKeyValueW, HKEY_CURRENT_USER, REG_SZ, RRF_RT_REG_SZ},
@@ -8,16 +9,12 @@ use windows_sys::Win32::{
 const KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const VALUE: &str = "WhiteHub";
 
-fn w(s: &str) -> Vec<u16> {
-    s.encode_utf16().chain(Some(0)).collect()
-}
-
 fn command() -> std::io::Result<String> {
     Ok(format!("\"{}\" {}", std::env::current_exe()?.display(), crate::app::AUTOSTART_ARG))
 }
 
 fn current() -> Option<String> {
-    let (key, name) = (w(KEY), w(VALUE));
+    let (key, name) = (wide(KEY), wide(VALUE));
     let mut buf = vec![0u16; 1024];
     let mut size = (buf.len() * 2) as u32;
     let rc = unsafe { RegGetValueW(HKEY_CURRENT_USER, key.as_ptr(), name.as_ptr(), RRF_RT_REG_SZ, std::ptr::null_mut(), buf.as_mut_ptr().cast(), &mut size) };
@@ -30,9 +27,9 @@ pub fn is_enabled() -> bool {
 }
 
 pub fn set(enabled: bool) -> Result<(), String> {
-    let (key, name) = (w(KEY), w(VALUE));
+    let (key, name) = (wide(KEY), wide(VALUE));
     let rc = if enabled {
-        let data = w(&command().map_err(|e| e.to_string())?);
+        let data = wide(&command().map_err(|e| e.to_string())?);
         unsafe { RegSetKeyValueW(HKEY_CURRENT_USER, key.as_ptr(), name.as_ptr(), REG_SZ, data.as_ptr().cast(), (data.len() * 2) as u32) }
     } else if current().is_some() {
         unsafe { RegDeleteKeyValueW(HKEY_CURRENT_USER, key.as_ptr(), name.as_ptr()) }

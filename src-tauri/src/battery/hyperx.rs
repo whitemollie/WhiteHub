@@ -1,8 +1,8 @@
 //! HyperX Cloud III S Wireless over its 2.4 GHz dongle (USB 03F0:06BE; 03F0:02CC is the same
 //! headset on another dongle revision according to community tools, untested).
 //!
-//! Protocol as documented by HyperX-Battery-Tray, hyperx-battery-logger and HyperHeadset (MIT)
-//! and verified on hardware. Vendor collection usage page 01C0 / usage 0001, 64-byte reports 0x0C:
+//! Protocol as documented by HyperX-Battery-Tray, hyperx-battery-logger and HyperHeadset (MIT).
+//! Vendor collection usage page 01C0 / usage 0001, 64-byte reports 0x0C:
 //!
 //! ```text
 //! battery  (output) 0C 02 03 01 00 06 | 00 …

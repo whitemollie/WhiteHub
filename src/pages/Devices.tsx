@@ -35,6 +35,25 @@ function MissingDevice() {
   };
   return (
     <Section title="My device is missing">
+      <p class="hint-box">
+        Bluetooth devices appear if Windows shows their battery under Settings, Bluetooth & devices. Devices with their own 2.4 GHz dongle appear if the
+        model is supported, see About.
+      </p>
+      <Show when={!state.devices.some((d) => d.id === "wlmouse" && d.known)}>
+        <Row
+          title="Another WLmouse mouse"
+          hint={'Product ID from the file below: the four characters after "36A7:". Untested. The Beast G battery query is sent to that device.'}
+        >
+          <input
+            class="input mono narrow"
+            aria-label="WLmouse product ID"
+            placeholder="e.g. A860"
+            value={deviceSettings("wlmouse")?.productId ?? ""}
+            maxLength={6}
+            onChange={(e) => updateSettings((s) => (s.devices.wlmouse.productId = e.currentTarget.value.trim() || null), 0)}
+          />
+        </Row>
+      </Show>
       <Row stack title="Create a device request" hint="Lists connected hardware without serial numbers, addresses or Bluetooth names. Nothing is sent: check the file, then attach it to a request on GitHub.">
         <Button onClick={run} disabled={busy()}>
           {busy() ? "Collecting…" : "Create file"}
@@ -148,15 +167,15 @@ function DeviceSection(props: { device: Device }) {
         </Row>
       </Show>
       <Show when={!d().discovered}>
-      <Row title="USB product ID" hint="Optional. Use only this receiver, e.g. A860. Other models are untested.">
-        <input
-          class="input mono narrow"
-          placeholder="Auto"
-          value={cfg().productId ?? ""}
-          maxLength={6}
-          onChange={(e) => set((c) => (c.productId = e.currentTarget.value.trim() || null), 0)}
-        />
-      </Row>
+        <Row title="USB product ID" hint="Optional. Use only this receiver, e.g. A860. Other models are untested.">
+          <input
+            class="input mono narrow"
+            placeholder="Auto"
+            value={cfg().productId ?? ""}
+            maxLength={6}
+            onChange={(e) => set((c) => (c.productId = e.currentTarget.value.trim() || null), 0)}
+          />
+        </Row>
       </Show>
     </Section>
   );

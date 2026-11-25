@@ -57,4 +57,4 @@ A cancelled run shows as failing on the badge.
 An update runs the old uninstaller in place and without `/UPDATE`, so `$UpdateMode` does not help. A real uninstall runs from a temporary copy. **Cost:** relies on how NSIS and Tauri's template work; check it when updating Tauri.
 
 ### 19. The tray icon is the full logo (0.2.2)
-Chosen by the owner, black tile included. It looks the same on dark and light taskbars, so it does not follow the theme. It is drawn from the shapes of `assets/app-icon.svg` to be sharp at every size. **Cost:** the battery in it is small at 16 pixels.
+Black tile included, as everywhere else. It looks the same on dark and light taskbars, so it does not follow the theme. It is drawn from the shapes of `assets/app-icon.svg` to be sharp at every size. **Cost:** the battery in it is small at 16 pixels.

@@ -1,8 +1,7 @@
 //! Polling manager: one background thread that owns the HID API and all providers.
 //!
-//! The thread sleeps in `recv_timeout` until the next device is due or a command arrives — no
-//! busy loops, no async runtime. Providers are polled one after another; a provider that fails or
-//! panics only affects its own snapshot.
+//! The thread sleeps until the next device is due or a command arrives. Providers are polled one
+//! after another; a provider that fails or panics only affects its own snapshot.
 use super::{
     now_ms,
     provider::{EventSource, Found, Outcome, Poll, Provider},

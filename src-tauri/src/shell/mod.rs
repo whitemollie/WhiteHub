@@ -8,6 +8,7 @@
 //! This thread therefore never blocks: it only draws. All device I/O runs on the manager thread.
 pub mod render;
 
+use crate::system::wide;
 use render::{render_strip, StripItem};
 use std::{
     cell::RefCell,
@@ -57,14 +58,10 @@ pub struct Shell {
     model: Arc<Mutex<StripModel>>,
 }
 
-fn w(s: &str) -> Vec<u16> {
-    s.encode_utf16().chain(Some(0)).collect()
-}
-
 /// Whether Windows uses the light theme for the taskbar.
 pub fn taskbar_is_light() -> bool {
-    let key = w(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-    let name = w("SystemUsesLightTheme");
+    let key = wide(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+    let name = wide("SystemUsesLightTheme");
     let mut value: u32 = 0;
     let mut size = 4u32;
     let rc = unsafe { RegGetValueW(HKEY_CURRENT_USER, key.as_ptr(), name.as_ptr(), RRF_RT_REG_DWORD, std::ptr::null_mut(), &mut value as *mut _ as *mut _, &mut size) };
@@ -129,8 +126,8 @@ fn with_state<R>(f: impl FnOnce(&mut State) -> R) -> Option<R> {
 
 unsafe fn run(model: Arc<Mutex<StripModel>>, sink: EventSink, ready: std::sync::mpsc::Sender<isize>) {
     let inst = GetModuleHandleW(std::ptr::null());
-    let owner_cls = w("WhiteHubShellOwner");
-    let strip_cls = w("WhiteHubBatteryStrip");
+    let owner_cls = wide("WhiteHubShellOwner");
+    let strip_cls = wide("WhiteHubBatteryStrip");
     RegisterClassW(&WNDCLASSW { lpfnWndProc: Some(owner_proc), hInstance: inst, lpszClassName: owner_cls.as_ptr(), ..std::mem::zeroed() });
     RegisterClassW(&WNDCLASSW {
         lpfnWndProc: Some(strip_proc),
@@ -140,9 +137,9 @@ unsafe fn run(model: Arc<Mutex<StripModel>>, sink: EventSink, ready: std::sync::
         ..std::mem::zeroed()
     });
     // A hidden *top-level* window: message-only windows do not receive broadcasts.
-    let owner = CreateWindowExW(WS_EX_TOOLWINDOW, owner_cls.as_ptr(), w("WhiteHub shell").as_ptr(), WS_POPUP, 0, 0, 0, 0, std::ptr::null_mut(), std::ptr::null_mut(), inst, std::ptr::null());
+    let owner = CreateWindowExW(WS_EX_TOOLWINDOW, owner_cls.as_ptr(), wide("WhiteHub shell").as_ptr(), WS_POPUP, 0, 0, 0, 0, std::ptr::null_mut(), std::ptr::null_mut(), inst, std::ptr::null());
     OWNER_HWND.store(owner as isize, Ordering::Relaxed);
-    let taskbar_created = RegisterWindowMessageW(w("TaskbarCreated").as_ptr());
+    let taskbar_created = RegisterWindowMessageW(wide("TaskbarCreated").as_ptr());
     STATE.with(|s| {
         *s.borrow_mut() = Some(State {
             owner,
@@ -197,8 +194,8 @@ impl State {
 
     /// Creates the strip inside the current taskbar. Returns false if the taskbar is not ready.
     unsafe fn embed(&mut self) -> bool {
-        let taskbar = FindWindowW(w("Shell_TrayWnd").as_ptr(), std::ptr::null());
-        let notify = if taskbar.is_null() { std::ptr::null_mut() } else { FindWindowExW(taskbar, std::ptr::null_mut(), w("TrayNotifyWnd").as_ptr(), std::ptr::null()) };
+        let taskbar = FindWindowW(wide("Shell_TrayWnd").as_ptr(), std::ptr::null());
+        let notify = if taskbar.is_null() { std::ptr::null_mut() } else { FindWindowExW(taskbar, std::ptr::null_mut(), wide("TrayNotifyWnd").as_ptr(), std::ptr::null()) };
         if taskbar.is_null() || notify.is_null() {
             return false;
         }
@@ -206,8 +203,8 @@ impl State {
         let inst = GetModuleHandleW(std::ptr::null());
         let strip = CreateWindowExW(
             WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
-            w("WhiteHubBatteryStrip").as_ptr(),
-            w("WhiteHub battery").as_ptr(),
+            wide("WhiteHubBatteryStrip").as_ptr(),
+            wide("WhiteHub battery").as_ptr(),
             WS_POPUP,
             0, 0, 1, 1,
             std::ptr::null_mut(), std::ptr::null_mut(), inst, std::ptr::null(),
@@ -321,7 +318,7 @@ impl State {
             SendMessageW(self.tooltip, TTM_DELTOOLW, 0, &ti as *const _ as LPARAM);
         }
         for (i, (it, (x0, x1))) in items.iter().zip(regions).enumerate() {
-            let mut text = w(&it.tooltip);
+            let mut text = wide(&it.tooltip);
             ti.uFlags = TTF_SUBCLASS;
             ti.uId = i + 1;
             ti.rect = RECT { left: *x0, top: 0, right: *x1, bottom: h };

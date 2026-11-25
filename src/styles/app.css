@@ -676,6 +676,12 @@ h2 {
   align-items: center;
 }
 
+.empty-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 /* ---------- About ---------- */
 .about-hero {
   display: flex;

@@ -14,7 +14,7 @@ body:
     attributes:
       label: WhiteHub version
       description: Shown on the About page.
-      placeholder: 0.1.9
+      placeholder: 0.2.3
     validations:
       required: true
   - type: input

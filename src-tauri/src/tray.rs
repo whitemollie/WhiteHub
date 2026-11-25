@@ -1,9 +1,8 @@
 //! Notification-area icons: the WhiteHub icon (always) and per-device fallback icons (shown when
 //! the taskbar strip is off or unavailable).
 //!
-//! Windows remembers "always show" per (executable, icon UID). tray-icon assigns UIDs in creation
-//! order, so icons are created once in a fixed order and afterwards only shown/hidden — never
-//! removed and recreated — to keep the user's pinning.
+//! Windows remembers "always show" per executable and icon ID. IDs are assigned in creation order,
+//! so icons are created once and afterwards only shown or hidden, which keeps the user's pinning.
 use crate::{indicators::TrayLevel, shell::render, window};
 use std::sync::Mutex;
 use tauri::{
@@ -85,23 +84,20 @@ impl Trays {
             }
             return;
         }
-        {
-            // Icons are added once per device and never removed, see the module comment.
-            for l in levels.iter().filter(|l| l.visible) {
-                if self.levels.iter().any(|(id, _)| *id == l.id) {
-                    continue;
-                }
-                let built = TrayIconBuilder::with_id(format!("level-{}", l.id))
-                    .on_tray_icon_event(|tray, e| {
-                        if let TrayIconEvent::Click { button_state: MouseButtonState::Up, .. } = e {
-                            window::open(tray.app_handle(), None);
-                        }
-                    })
-                    .build(app);
-                match built {
-                    Ok(t) => self.levels.push((l.id.clone(), t)),
-                    Err(e) => log::error!("[tray] cannot create icon for {}: {e}", l.id),
-                }
+        for l in levels.iter().filter(|l| l.visible) {
+            if self.levels.iter().any(|(id, _)| *id == l.id) {
+                continue;
+            }
+            let built = TrayIconBuilder::with_id(format!("level-{}", l.id))
+                .on_tray_icon_event(|tray, e| {
+                    if let TrayIconEvent::Click { button_state: MouseButtonState::Up, .. } = e {
+                        window::open(tray.app_handle(), None);
+                    }
+                })
+                .build(app);
+            match built {
+                Ok(t) => self.levels.push((l.id.clone(), t)),
+                Err(e) => log::error!("[tray] cannot create icon for {}: {e}", l.id),
             }
         }
         let size = icon_size();
