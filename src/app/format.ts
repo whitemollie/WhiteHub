@@ -42,10 +42,10 @@ export function statusText(d: Device): string {
   }
 }
 
-/** How trustworthy the shown value is. */
+/** Where the shown value comes from. Not a live stream: it is as old as the last reading. */
 export function sourceText(d: Device): string {
   if (d.status === "disabled") return "Monitoring off";
-  if (d.status === "online") return "Live reading";
+  if (d.status === "online") return "Read from device";
   if (d.percent !== null) return "Last known value";
   if (d.status === "unknown") return "Waiting for first reading";
   return "No reading yet";

@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { api, type Device } from "../app/api";
-import { clock, sourceText, statusText, statusTone } from "../app/format";
-import { deviceSettings, state, updateSettings } from "../app/store";
+import { clock, relativeTime, sourceText, statusText, statusTone } from "../app/format";
+import { deviceSettings, now, state, updateSettings } from "../app/store";
 import { Button, Row, Section, Slider, Toggle } from "../components/Controls";
 import { DeviceGlyph } from "../components/DeviceCard";
 import { RefreshIcon } from "../components/Icons";
@@ -52,7 +52,11 @@ function DeviceSection(props: { device: Device }) {
           <dd>
             {d().percent !== null ? `${d().percent}%` : "—"}
             <Show when={d().millivolts}> · {(d().millivolts! / 1000).toFixed(2)} V</Show>
-            <span class="muted"> · {sourceText(d())}</span>
+            <span class="muted">
+              {" "}
+              · {sourceText(d())}
+              <Show when={d().lastUpdate}>, {relativeTime(d().lastUpdate, now()).toLowerCase()}</Show>
+            </span>
           </dd>
           <dt>Receiver</dt>
           <dd>
@@ -64,7 +68,11 @@ function DeviceSection(props: { device: Device }) {
           <dd class="small">{d().source || "—"}</dd>
           <dt>Last reading</dt>
           <dd>
-            {clock(d().lastUpdate)} <span class="muted">· last attempt {clock(d().lastAttempt)}</span>
+            {clock(d().lastUpdate)}
+            {/* Only worth showing when the latest attempt did not produce a reading. */}
+            <Show when={d().lastAttempt !== d().lastUpdate}>
+              <span class="muted"> · last attempt {clock(d().lastAttempt)}</span>
+            </Show>
           </dd>
         </dl>
       </div>

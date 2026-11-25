@@ -24,7 +24,10 @@ export async function load() {
   const start = (s.initialPage ?? s.settings.ui.lastPage) as Page;
   if (PAGES.includes(start)) setPageSignal(start);
   setState({ ready: true, devices: s.devices, settings: s.settings, app: s.app });
-  api.onDevices((d) => setState("devices", reconcile(d, { key: "id" })));
+  api.onDevices((d) => {
+    setNow(Date.now());
+    setState("devices", reconcile(d, { key: "id" }));
+  });
   api.onNavigate((p) => PAGES.includes(p as Page) && navigate(p as Page));
   setInterval(() => setNow(Date.now()), 30_000);
 }
