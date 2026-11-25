@@ -23,7 +23,7 @@ Other mice, headsets, keyboards and Bluetooth devices are not supported yet. Wit
 - Charging indicator, low-battery and connection notifications
 - Dark and light themes with custom colours
 - Polling every 5 to 60 minutes, optional start with Windows
-- Small footprint: one process and about 3 MB of private memory in the background; the window (WebView2) is loaded only while it is open
+- Small footprint: one background process, about 7 MB of private memory once the window has been used; the window itself (WebView2) is loaded only while it is open
 
 ## Install
 
