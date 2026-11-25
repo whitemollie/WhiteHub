@@ -21,9 +21,9 @@ export function About() {
         <dt>Author</dt>
         <dd>whitemollie</dd>
         <dt>Supported</dt>
-        <dd>WLmouse Beast G (2.4 GHz receiver 36A7:A860) · HyperX Cloud III S Wireless (dongle 03F0:06BE)</dd>
+        <dd>WLmouse Beast G · HyperX Cloud III S Wireless · Bluetooth devices whose battery Windows knows · Xbox controllers</dd>
         <dt>Method</dt>
-        <dd>Standard Windows HID driver, vendor-defined reports. The mouse query matches the official WL MOUSE HUB.</dd>
+        <dd>Read-only HID queries for the two receivers; for everything else the level Windows itself reports.</dd>
         <dt>Settings</dt>
         <dd class="mono small">{state.app?.configPath}</dd>
         <dt>Logs</dt>

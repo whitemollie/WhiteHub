@@ -1,9 +1,16 @@
 //! Application lifecycle: wiring of settings, battery manager, shell integration, tray and window.
 use crate::{
     autostart,
-    battery::{hyperx::HyperX, manager::{Cmd, Manager}, wlmouse::WlMouse, DeviceSnapshot},
+    battery::{
+        bluetooth::Bluetooth,
+        hyperx::HyperX,
+        manager::{Cmd, Manager},
+        wlmouse::WlMouse,
+        xinput::XInput,
+        DeviceSnapshot,
+    },
     commands, indicators, logging, notifications,
-    settings::{IndicatorMode, Settings, Store},
+    settings::{IndicatorMode, KnownDevice, Settings, Store},
     shell::{self, Shell, ShellEvent, StripModel},
     tray::{self, TrayState},
     window,
@@ -51,6 +58,8 @@ pub fn run() {
             commands::refresh,
             commands::window_ready,
             commands::close_window,
+            commands::forget_device,
+            commands::export_device_request,
             commands::export_diagnostics,
             commands::open_logs_folder,
             commands::quit,
@@ -98,6 +107,7 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let h = app.clone();
     let manager = Manager::start(
         vec![Box::new(WlMouse::new()), Box::new(HyperX::new())],
+        vec![Box::new(Bluetooth), Box::new(XInput)],
         &settings,
         Box::new(move |snaps, events| on_devices(&h, snaps, events)),
     );
@@ -174,10 +184,48 @@ fn with_state(app: &AppHandle, f: impl FnOnce(&AppState)) {
 
 fn on_devices(app: &AppHandle, snaps: &[DeviceSnapshot], events: Vec<crate::battery::manager::Event>) {
     let Some(state) = app.try_state::<AppState>() else { return };
+    remember_devices(app, &state, snaps);
     let settings = state.settings();
     notifications::send(app, &settings.notifications, &events);
     let _ = app.emit_to(window::LABEL, "devices", snaps);
     refresh_indicators_with(app, &settings, snaps);
+}
+
+/// Stores the name and type of devices seen for the first time (or renamed).
+fn remember_devices(app: &AppHandle, state: &AppState, snaps: &[DeviceSnapshot]) {
+    let Ok(mut settings) = state.settings.lock() else { return };
+    let mut changed = false;
+    for s in snaps.iter().filter(|s| s.known) {
+        let known = Some(KnownDevice { name: s.default_name.clone(), kind: s.kind });
+        let d = settings.devices.entry(s.id.clone()).or_default();
+        if d.known != known {
+            d.known = known;
+            changed = true;
+        }
+    }
+    if changed {
+        if let Err(e) = state.store.save(&settings) {
+            log::error!("[settings] cannot save: {e}");
+        }
+        let _ = app.emit_to(window::LABEL, "settings", &*settings);
+    }
+}
+
+/// Removes a discovered device that is not connected.
+pub fn forget_device(app: &AppHandle, id: &str) -> Result<Settings, String> {
+    let state = app.try_state::<AppState>().ok_or("not ready")?;
+    if crate::battery::scanner::connection_of(id).is_none() {
+        return Err("built-in devices cannot be removed".into());
+    }
+    if state.manager.snapshots().iter().any(|s| s.id == id && s.status == crate::battery::Status::Online) {
+        return Err("the device is connected".into());
+    }
+    let mut settings = state.settings.lock().map_err(|_| "settings unavailable")?;
+    settings.devices.remove(id);
+    state.store.save(&settings).map_err(|e| format!("cannot save settings: {e}"))?;
+    state.manager.send(Cmd::Forget(id.to_owned()));
+    log::info!("[app] forgot {id}");
+    Ok(settings.clone())
 }
 
 pub fn refresh_indicators(app: &AppHandle) {
@@ -209,8 +257,8 @@ fn refresh_indicators_with(app: &AppHandle, settings: &Settings, snaps: &[Device
 
 fn summary(snaps: &[DeviceSnapshot]) -> String {
     let mut s = String::from("WhiteHub");
-    for d in snaps.iter().filter(|d| d.enabled) {
-        s.push_str(&format!("\n{}: {}", d.name, d.percent.map_or("--".into(), |p| format!("{p}%"))));
+    for d in snaps.iter().filter(|d| d.known && d.enabled && !(d.discovered && d.status == crate::battery::Status::Disconnected)) {
+        s.push_str(&format!("\n{}: {}", d.name, indicators::value(d).unwrap_or_else(|| "--".into())));
     }
     s.chars().take(120).collect()
 }
@@ -218,10 +266,11 @@ fn summary(snaps: &[DeviceSnapshot]) -> String {
 /// Applies new settings: validate, persist, and push to every subsystem.
 pub fn apply_settings(app: &AppHandle, mut new: Settings) -> Result<Settings, String> {
     let state = app.try_state::<AppState>().ok_or("not ready")?;
+    let old = state.settings();
+    new.keep_known(&old);
     for fix in new.validate() {
         log::warn!("[settings] {fix}");
     }
-    let old = state.settings();
     state.store.save(&new).map_err(|e| format!("cannot save settings: {e}"))?;
     if let Ok(mut s) = state.settings.lock() {
         *s = new.clone();

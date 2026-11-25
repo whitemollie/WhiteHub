@@ -1,5 +1,14 @@
 # What's new
 
+## 0.2.0 — 2026-11-25
+
+- Devices appear by themselves; the list is no longer fixed
+- Bluetooth devices whose battery Windows knows (tested with a mouse)
+- Xbox wireless controllers with battery steps (untested)
+- Keyboard, gamepad and Bluetooth icons; the device type can be corrected by hand
+- Devices that are away can be forgotten
+- "My device is missing" creates a file for a device request
+
 ## 0.1.9 — 2026-11-25
 
 - Only tested devices are queried automatically; other WLmouse models need a product ID entered by hand

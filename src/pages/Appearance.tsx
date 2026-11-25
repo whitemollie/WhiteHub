@@ -111,7 +111,7 @@ export function Appearance() {
       </Section>
 
       <Section title="Device icons">
-        <For each={state.devices}>
+        <For each={state.devices.filter((d) => d.known && state.settings!.devices[d.id])}>
           {(d) => {
             const custom = () => state.settings!.devices[d.id]?.customIcon;
             const pick = (file: File | undefined) => {

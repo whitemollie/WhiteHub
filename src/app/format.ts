@@ -1,4 +1,29 @@
-import type { Device, Settings } from "./api";
+import type { Device, DeviceKind, Level, Settings } from "./api";
+
+export const KINDS: { value: DeviceKind; label: string }[] = [
+  { value: "mouse", label: "Mouse" },
+  { value: "keyboard", label: "Keyboard" },
+  { value: "headset", label: "Headset" },
+  { value: "gamepad", label: "Gamepad" },
+  { value: "other", label: "Other" },
+];
+
+const LEVELS: Record<Level, { label: string; percent: number }> = {
+  empty: { label: "Empty", percent: 0 },
+  low: { label: "Low", percent: 20 },
+  medium: { label: "Medium", percent: 55 },
+  full: { label: "Full", percent: 100 },
+};
+
+/** Battery value as text; null if unknown. */
+export function valueText(d: Device): string | null {
+  return d.percent !== null ? `${d.percent}%` : d.level ? LEVELS[d.level].label : null;
+}
+
+/** Percentage for the bar; steps are placed where their colour fits. */
+export function barPercent(d: Device): number | null {
+  return d.percent ?? (d.level ? LEVELS[d.level].percent : null);
+}
 
 export const DEFAULTS = {
   dark: { accent: "#3b82f6", background: "#0a0a0a", card: "#111111", text: "#ededed", textMuted: "#a1a1a1" },
@@ -30,7 +55,7 @@ export function statusText(d: Device): string {
     case "online":
       return d.charging ? "Charging" : "Connected";
     case "asleep":
-      return "Asleep";
+      return d.discovered ? "No level" : "Asleep";
     case "off":
       return "Device off";
     case "disconnected":
@@ -45,8 +70,8 @@ export function statusText(d: Device): string {
 /** Where the shown value comes from. Not a live stream: it is as old as the last reading. */
 export function sourceText(d: Device): string {
   if (d.status === "disabled") return "Monitoring off";
-  if (d.status === "online") return "Read from device";
-  if (d.percent !== null) return "Last known value";
+  if (d.status === "online") return d.discovered ? "Reported by Windows" : "Read from device";
+  if (valueText(d) !== null) return "Last known value";
   if (d.status === "unknown") return "Waiting for first reading";
   return "No reading yet";
 }

@@ -13,7 +13,7 @@ pub fn compose(rules: &Notifications, e: &Event) -> Option<(String, String)> {
         Event::Disconnected { name, .. } if rules.on_disconnect => {
             Some((format!("{name} disconnected"), "The last known battery level stays visible.".into()))
         }
-        Event::Low { name, percent, .. } if rules.on_low => Some((format!("{name}: battery low"), format!("{percent}% remaining. Time to charge."))),
+        Event::Low { name, level, .. } if rules.on_low => Some((format!("{name}: battery low"), format!("Battery level: {level}. Time to charge."))),
         _ => None,
     }
 }
@@ -39,12 +39,12 @@ mod tests {
     #[test]
     fn rules_and_dnd() {
         let mut r = Notifications::default();
-        let low = Event::Low { id: "hyperx", name: "Headset".into(), percent: 12 };
+        let low = Event::Low { id: "hyperx".into(), name: "Headset".into(), level: "12%".into() };
         assert!(compose(&r, &low).unwrap().1.contains("12%"));
         r.on_low = false;
         assert!(compose(&r, &low).is_none());
         r = Notifications::default();
         r.do_not_disturb = true;
-        assert!(compose(&r, &Event::Connected { id: "x", name: "M".into() }).is_none());
+        assert!(compose(&r, &Event::Connected { id: "x".into(), name: "M".into() }).is_none());
     }
 }

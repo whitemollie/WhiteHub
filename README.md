@@ -8,7 +8,7 @@
 
 No vendor apps in the background. No drivers. No network access.
 
-![Release](https://img.shields.io/badge/release-v0.1.9-0078D4?style=flat-square)
+![Release](https://img.shields.io/badge/release-v0.2.0-0078D4?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?style=flat-square)
 ![License](https://img.shields.io/badge/license-GPL--3.0-22C55E?style=flat-square)
 [![CI](https://github.com/whitemollie/WhiteHub/actions/workflows/ci.yml/badge.svg)](https://github.com/whitemollie/WhiteHub/actions/workflows/ci.yml)
@@ -34,6 +34,7 @@ No vendor apps in the background. No drivers. No network access.
 
 | Feature | What you get |
 |---|---|
+| **Found by itself** | Connect a supported device and it appears, with nothing to set up |
 | **Always in sight** | Battery levels sit next to the clock, so you never have to open another app |
 | **Charging status** | A bolt appears when a device is on its cable |
 | **Timely alerts** | Low battery, connected and disconnected, with do not disturb |
@@ -57,22 +58,24 @@ No vendor apps in the background. No drivers. No network access.
 
 1. Download `WhiteHub_x.y.z_x64-setup.exe` from [Releases](../../releases).
 2. Run it. It installs for your user only and needs no administrator rights.
-3. Plug in a [supported device](#devices). The battery appears on the taskbar.
+3. Connect a [supported device](#devices). Its battery appears on the taskbar by itself.
 
 > [!NOTE]
 > The installer is not code-signed, so Windows SmartScreen may warn about an unknown publisher.
 
 ## Devices
 
-| Device | USB receiver | Status |
+| Device | Connection | Status |
 |---|---|---|
-| WLmouse Beast G | `36A7:A860`, cable `36A7:A861` | Tested |
-| HyperX Cloud III **S** Wireless | `03F0:06BE` | Tested |
-| HyperX Cloud III S Wireless, other dongle | `03F0:02CC` | Untested |
+| Any Bluetooth device whose battery Windows shows | Bluetooth | Tested with a mouse |
+| WLmouse Beast G | 2.4 GHz `36A7:A860`, cable `36A7:A861` | Tested |
+| HyperX Cloud III **S** Wireless | 2.4 GHz `03F0:06BE` | Tested |
+| HyperX Cloud III S Wireless, other dongle | 2.4 GHz `03F0:02CC` | Untested |
+| Xbox wireless controllers (battery steps) | XInput | Untested |
 | Other WLmouse mice | Product ID entered by hand | Untested |
 
 > [!IMPORTANT]
-> WhiteHub is not universal: every vendor uses its own protocol. Other mice, headsets, keyboards and Bluetooth devices are not supported yet. Missing yours? [Request a device](../../issues/new?template=device-request.yml).
+> Devices on their own 2.4 GHz dongle need support for that model, because every vendor uses its own protocol. Missing yours? Press **Devices → My device is missing → Create file** and [request it](../../issues/new?template=device-request.yml).
 
 ## FAQ
 
@@ -80,6 +83,12 @@ No vendor apps in the background. No drivers. No network access.
 <summary><b>Why does my mouse show an old value?</b></summary>
 
 A sleeping mouse does not report its battery. WhiteHub shows the last known value dimmed and tries again. Move the mouse and press **Refresh now**.
+</details>
+
+<details>
+<summary><b>Which Bluetooth devices work?</b></summary>
+
+Those whose level Windows itself shows in *Settings → Bluetooth & devices*. WhiteHub reads that number and sends nothing to the device. The Windows property is not officially documented.
 </details>
 
 <details>
@@ -114,7 +123,7 @@ About 7 MB of private memory in the background once the window has been used (me
 
 ## Privacy
 
-WhiteHub sends only read-only battery queries, and only to the USB devices listed above or to one you choose by its product ID. Settings live in `%APPDATA%\com.whitehub.desktop`, logs in `%LOCALAPPDATA%\com.whitehub.desktop`. Vulnerabilities: [SECURITY.md](SECURITY.md).
+WhiteHub sends only read-only battery queries, and only to the USB receivers listed above or to one you choose by its product ID. Bluetooth levels come from Windows. Settings live in `%APPDATA%\com.whitehub.desktop`, logs in `%LOCALAPPDATA%\com.whitehub.desktop`. Vulnerabilities: [SECURITY.md](SECURITY.md).
 
 ## For developers
 

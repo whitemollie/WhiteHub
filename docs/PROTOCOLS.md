@@ -1,5 +1,7 @@
 # Device protocols
 
+Bluetooth devices and Xbox controllers are not queried: WhiteHub reads the level Windows publishes (device property `{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2`, not officially documented, and `XInputGetBatteryInformation`).
+
 All queries are read-only. Bytes are hexadecimal. Sources: [CREDITS.md](../CREDITS.md).
 
 ## WLmouse Beast G

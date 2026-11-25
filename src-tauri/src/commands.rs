@@ -58,6 +58,26 @@ pub fn refresh(state: State<'_, AppState>, id: Option<String>) {
     state.manager.send(Cmd::Refresh(id));
 }
 
+#[tauri::command]
+pub fn forget_device(app: AppHandle, id: String) -> Result<Settings, String> {
+    app::forget_device(&app, &id)
+}
+
+/// Writes a description of the connected hardware to the desktop, for a device request.
+/// Async so that waiting for a poll in progress does not block the window.
+#[tauri::command(async)]
+pub fn export_device_request(app: AppHandle, state: State<'_, AppState>) -> Result<String, String> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    state.manager.send(Cmd::Report(tx));
+    let body = rx.recv_timeout(std::time::Duration::from_secs(10)).map_err(|_| "the devices did not answer in time")?;
+    let text = format!(
+        "WhiteHub device request\nVersion: {}\nWindows build: {}\n\nDevice model (please fill in): \n\n{body}\nThis file contains no serial numbers, addresses or Bluetooth names.\nCheck it, then attach it to a device request.\n",
+        app.package_info().version,
+        system::windows_build()
+    );
+    save_to_desktop(&app, "WhiteHub-device-request", &text)
+}
+
 /// The page has painted its first frame; the window can be shown.
 #[tauri::command]
 pub fn window_ready(app: AppHandle) {
@@ -114,12 +134,17 @@ pub fn export_diagnostics(app: AppHandle, state: State<'_, AppState>) -> Result<
         serde_json::to_string_pretty(&settings).unwrap_or_default(),
         logging::read_all(),
     );
+    save_to_desktop(&app, "WhiteHub-diagnostics", &report)
+}
+
+/// Saves a text file to the desktop (profile folder redacted) and selects it in Explorer.
+fn save_to_desktop(app: &AppHandle, name: &str, text: &str) -> Result<String, String> {
     let profile = app.path().home_dir().map(|p| p.display().to_string()).unwrap_or_default();
     let dir = app.path().desktop_dir().or_else(|_| app.path().download_dir()).map_err(|e| e.to_string())?;
     let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-    let path = dir.join(format!("WhiteHub-diagnostics-{stamp}.txt"));
-    std::fs::write(&path, redact(&report, &profile)).map_err(|e| e.to_string())?;
-    log::info!("[app] diagnostics exported");
+    let path = dir.join(format!("{name}-{stamp}.txt"));
+    std::fs::write(&path, redact(text, &profile)).map_err(|e| e.to_string())?;
+    log::info!("[app] {name} exported");
     let _ = explorer().arg(format!("/select,{}", path.display())).spawn();
     Ok(path.display().to_string())
 }

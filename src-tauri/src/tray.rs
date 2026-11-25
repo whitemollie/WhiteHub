@@ -19,7 +19,7 @@ use windows_sys::Win32::UI::{
 
 pub struct Trays {
     app_icon: TrayIcon,
-    levels: Vec<(&'static str, TrayIcon)>,
+    levels: Vec<(String, TrayIcon)>,
 }
 
 pub struct TrayState(pub Mutex<Option<Trays>>);
@@ -89,8 +89,12 @@ impl Trays {
             }
             return;
         }
-        if self.levels.is_empty() {
-            for l in levels {
+        {
+            // Icons are added once per device and never removed, see the module comment.
+            for l in levels.iter().filter(|l| l.visible) {
+                if self.levels.iter().any(|(id, _)| *id == l.id) {
+                    continue;
+                }
                 let built = TrayIconBuilder::with_id(format!("level-{}", l.id))
                     .on_tray_icon_event(|tray, e| {
                         if let TrayIconEvent::Click { button_state: MouseButtonState::Up, .. } = e {
@@ -99,7 +103,7 @@ impl Trays {
                     })
                     .build(app);
                 match built {
-                    Ok(t) => self.levels.push((l.id, t)),
+                    Ok(t) => self.levels.push((l.id.clone(), t)),
                     Err(e) => log::error!("[tray] cannot create icon for {}: {e}", l.id),
                 }
             }
@@ -107,7 +111,10 @@ impl Trays {
         let size = icon_size();
         let fgc = fg(light);
         for (id, t) in &self.levels {
-            let Some(l) = levels.iter().find(|l| l.id == *id) else { continue };
+            let Some(l) = levels.iter().find(|l| l.id == *id) else {
+                let _ = t.set_visible(false); // forgotten device
+                continue;
+            };
             let text_color = if l.dim { [0x8a, 0x8a, 0x8a] } else { fgc };
             if let Some(px) = render::render_level_icon(size, &l.text, l.level, text_color, l.color) {
                 let _ = t.set_icon(Some(Image::new_owned(px, size, size)));

@@ -26,6 +26,11 @@ body:
     validations:
       required: true
   - type: textarea
+    id: report
+    attributes:
+      label: Device request file
+      description: "WhiteHub: Devices → My device is missing → Create file. Check it, then drag it here."
+  - type: textarea
     id: notes
     attributes:
       label: Notes

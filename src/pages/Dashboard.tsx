@@ -6,7 +6,7 @@ import { RefreshIcon } from "../components/Icons";
 
 export function Dashboard() {
   const [busy, setBusy] = createSignal(false);
-  const devices = () => state.devices.filter((d) => d.enabled);
+  const devices = () => state.devices.filter((d) => d.known && d.enabled);
   const refresh = async () => {
     setBusy(true);
     await api.refresh();
@@ -17,7 +17,7 @@ export function Dashboard() {
       <header class="page-head">
         <div>
           <h1>Dashboard</h1>
-          <p class="muted">Every {state.settings?.pollIntervalMinutes} min · read directly from the receivers</p>
+          <p class="muted">Every {state.settings?.pollIntervalMinutes} min · devices appear by themselves</p>
         </div>
         <button type="button" class="btn icon-btn" classList={{ spinning: busy() }} onClick={refresh} title="Refresh now" aria-label="Refresh now">
           <RefreshIcon />
@@ -38,7 +38,7 @@ export function Dashboard() {
 function EmptyState() {
   return (
     <div class="empty">
-      <p>All devices are disabled.</p>
+      <p>{state.devices.some((d) => d.known) ? "All devices are disabled." : "No supported device found yet. Connect one, it appears by itself."}</p>
       <button type="button" class="link" onClick={() => navigate("devices")}>
         Manage devices
       </button>

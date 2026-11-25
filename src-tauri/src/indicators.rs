@@ -1,8 +1,8 @@
 //! Turns device snapshots into what the taskbar strip and the tray show.
 use crate::{
-    battery::{DeviceKind, DeviceSnapshot, Status},
+    battery::{DeviceKind, DeviceSnapshot, Level, Status},
     settings::{Colorize, IconSet, Settings},
-    shell::render::{StripItem, GLYPH_HEADPHONE, GLYPH_HEADSET, GLYPH_MOUSE},
+    shell::render::{StripItem, GLYPH_BLUETOOTH, GLYPH_GAMEPAD, GLYPH_HEADPHONE, GLYPH_HEADSET, GLYPH_KEYBOARD, GLYPH_MOUSE},
 };
 
 pub const DEFAULT_HIGH: [u8; 3] = [0x22, 0xc5, 0x5e];
@@ -32,8 +32,10 @@ pub fn status_label(s: &DeviceSnapshot) -> String {
         Status::Unknown => "Checking…".into(),
         Status::Online if s.charging => "Connected, charging".into(),
         Status::Online => "Connected".into(),
+        Status::Asleep if s.discovered => "Connected, no battery level reported".into(),
         Status::Asleep => "Asleep, showing last known level".into(),
         Status::Off => "Device off or out of range".into(),
+        Status::Disconnected if s.discovered => "Not connected".into(),
         Status::Disconnected => "Receiver not connected".into(),
         Status::Error => format!("Error: {}", s.error.as_deref().unwrap_or("unknown")),
         Status::Disabled => "Monitoring disabled".into(),
@@ -57,30 +59,52 @@ pub fn local_time(ms: u64) -> String {
     }
 }
 
+/// Battery value as text, e.g. "64%" or "Low".
+pub fn value(s: &DeviceSnapshot) -> Option<String> {
+    s.percent.map(|p| format!("{p}%")).or_else(|| s.level.map(|l| l.label().to_owned()))
+}
+
 pub fn tooltip(s: &DeviceSnapshot) -> String {
-    let level = s.percent.map_or("Battery unknown".to_string(), |p| format!("Battery {p}%"));
+    let level = value(s).map_or("Battery unknown".to_string(), |v| format!("Battery {v}"));
     let updated = s.last_update.map_or("never updated".to_string(), |t| format!("updated {}", local_time(t)));
     format!("{}\n{level}, {updated}\n{}", s.name, status_label(s))
 }
 
+/// Percentage for colours and bars; steps are placed where their colour fits.
+fn approx(s: &DeviceSnapshot) -> Option<u8> {
+    s.percent.or(s.level.map(|l| match l {
+        Level::Empty => 0,
+        Level::Low => 20,
+        Level::Medium => 55,
+        Level::Full => 100,
+    }))
+}
+
 fn visible<'a>(settings: &'a Settings, snaps: &'a [DeviceSnapshot]) -> impl Iterator<Item = &'a DeviceSnapshot> {
-    snaps.iter().filter(move |s| s.enabled && settings.device(s.id).show_in_indicator)
+    // Discovered devices disappear while away; fixed ones keep their last value.
+    snaps.iter().filter(move |s| s.known && s.enabled && (!s.discovered || s.status != Status::Disconnected) && settings.device(&s.id).show_in_indicator)
 }
 
 pub fn strip_items(settings: &Settings, snaps: &[DeviceSnapshot]) -> Vec<StripItem> {
     visible(settings, snaps)
         .map(|s| {
             let glyph = match (settings.appearance.icon_set, s.kind) {
-                (IconSet::Fluent, DeviceKind::Mouse) | (IconSet::Alternate, DeviceKind::Mouse) => Some(GLYPH_MOUSE),
-                (IconSet::Fluent, DeviceKind::Headset) => Some(GLYPH_HEADPHONE),
-                (IconSet::Alternate, DeviceKind::Headset) => Some(GLYPH_HEADSET),
                 (IconSet::Text, _) => None,
+                (_, DeviceKind::Mouse) => Some(GLYPH_MOUSE),
+                (_, DeviceKind::Keyboard) => Some(GLYPH_KEYBOARD),
+                (IconSet::Alternate, DeviceKind::Headset) => Some(GLYPH_HEADSET),
+                (_, DeviceKind::Headset) => Some(GLYPH_HEADPHONE),
+                (_, DeviceKind::Gamepad) => Some(GLYPH_GAMEPAD),
+                (_, DeviceKind::Other) => Some(GLYPH_BLUETOOTH),
             };
             let label = match s.kind {
                 DeviceKind::Mouse => "M",
+                DeviceKind::Keyboard => "K",
                 DeviceKind::Headset => "H",
+                DeviceKind::Gamepad => "G",
+                DeviceKind::Other => "B",
             };
-            let color = s.percent.and_then(|p| match settings.indicators.colorize {
+            let color = approx(s).and_then(|p| match settings.indicators.colorize {
                 Colorize::Off => None,
                 Colorize::LowOnly => (p < settings.appearance.low_threshold).then(|| level_color(settings, p)),
                 Colorize::All => Some(level_color(settings, p)),
@@ -88,7 +112,7 @@ pub fn strip_items(settings: &Settings, snaps: &[DeviceSnapshot]) -> Vec<StripIt
             StripItem {
                 glyph,
                 label: label.into(),
-                text: s.percent.map_or("--".into(), |p| format!("{p}%")),
+                text: value(s).unwrap_or_else(|| "--".into()),
                 color,
                 dim: s.status != Status::Online,
                 charging: s.charging,
@@ -100,7 +124,7 @@ pub fn strip_items(settings: &Settings, snaps: &[DeviceSnapshot]) -> Vec<StripIt
 
 /// Data for one fallback tray icon.
 pub struct TrayLevel {
-    pub id: &'static str,
+    pub id: String,
     pub text: String,
     pub level: Option<u8>,
     pub color: [u8; 3],
@@ -110,16 +134,18 @@ pub struct TrayLevel {
 }
 
 pub fn tray_levels(settings: &Settings, snaps: &[DeviceSnapshot]) -> Vec<TrayLevel> {
+    let shown: Vec<&str> = visible(settings, snaps).map(|s| s.id.as_str()).collect();
     snaps
         .iter()
+        .filter(|s| s.known)
         .map(|s| TrayLevel {
-            id: s.id,
-            text: s.percent.map_or("--".into(), |p| p.to_string()),
-            level: s.percent,
-            color: s.percent.map_or(DEFAULT_MID, |p| level_color(settings, p)),
+            id: s.id.clone(),
+            text: s.percent.map_or_else(|| s.level.map_or("--".into(), |l| l.label()[..1].into()), |p| p.to_string()),
+            level: approx(s),
+            color: approx(s).map_or(DEFAULT_MID, |p| level_color(settings, p)),
             dim: s.status != Status::Online,
             tooltip: tooltip(s),
-            visible: s.enabled && settings.device(s.id).show_in_indicator,
+            visible: shown.contains(&s.id.as_str()),
         })
         .collect()
 }
@@ -130,12 +156,16 @@ mod tests {
 
     fn snap(status: Status, percent: Option<u8>) -> DeviceSnapshot {
         DeviceSnapshot {
-            id: "wlmouse",
+            id: "wlmouse".into(),
             name: "WLmouse Beast G".into(),
+            default_name: "WLmouse Beast G".into(),
+            known: true,
+            discovered: false,
             kind: DeviceKind::Mouse,
             connection: "2.4 GHz receiver",
             status,
             percent,
+            level: None,
             charging: false,
             millivolts: None,
             last_update: None,
@@ -178,6 +208,22 @@ mod tests {
         assert_eq!(strip_items(&s, &[snap(Status::Online, Some(10))])[0].color, None);
         s.indicators.colorize = Colorize::All;
         assert_eq!(strip_items(&s, &[snap(Status::Online, Some(90))])[0].color, Some(DEFAULT_HIGH));
+    }
+
+    #[test]
+    fn absent_and_unknown_devices_are_not_shown() {
+        let s = Settings::default();
+        let gone = DeviceSnapshot { discovered: true, ..snap(Status::Disconnected, Some(50)) };
+        let never_seen = DeviceSnapshot { known: false, ..snap(Status::Disconnected, None) };
+        assert!(strip_items(&s, &[gone, never_seen]).is_empty());
+    }
+
+    #[test]
+    fn steps_are_shown_as_text() {
+        let s = Settings::default();
+        let pad = DeviceSnapshot { kind: DeviceKind::Gamepad, level: Some(Level::Low), ..snap(Status::Online, None) };
+        let item = &strip_items(&s, &[pad])[0];
+        assert_eq!((item.text.as_str(), item.color), ("Low", Some(DEFAULT_LOW)));
     }
 
     #[test]

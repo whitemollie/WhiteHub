@@ -1,16 +1,21 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
-export type DeviceKind = "mouse" | "headset";
+export type DeviceKind = "mouse" | "keyboard" | "headset" | "gamepad" | "other";
+export type Level = "empty" | "low" | "medium" | "full";
 export type Status = "unknown" | "online" | "asleep" | "off" | "disconnected" | "error" | "disabled";
 
 export interface Device {
   id: string;
   name: string;
+  defaultName: string;
+  known: boolean;
+  discovered: boolean;
   kind: DeviceKind;
   connection: string;
   status: Status;
   percent: number | null;
+  level: Level | null;
   charging: boolean;
   millivolts: number | null;
   lastUpdate: number | null;
@@ -46,6 +51,8 @@ export interface DeviceSettings {
   lowThreshold: number;
   showInIndicator: boolean;
   customIcon: string | null;
+  kind: DeviceKind | null;
+  known: { name: string; kind: DeviceKind } | null;
 }
 
 export interface Settings {
@@ -88,9 +95,12 @@ export const api = {
   refresh: (id?: string) => invoke<void>("refresh", { id: id ?? null }),
   windowReady: () => invoke<void>("window_ready"),
   closeWindow: () => invoke<void>("close_window"),
+  forgetDevice: (id: string) => invoke<Settings>("forget_device", { id }),
+  exportDeviceRequest: () => invoke<string>("export_device_request"),
   exportDiagnostics: () => invoke<string>("export_diagnostics"),
   openLogsFolder: () => invoke<void>("open_logs_folder"),
   quit: () => invoke<void>("quit"),
   onDevices: (cb: (d: Device[]) => void): Promise<UnlistenFn> => listen<Device[]>("devices", (e) => cb(e.payload)),
+  onSettings: (cb: (s: Settings) => void): Promise<UnlistenFn> => listen<Settings>("settings", (e) => cb(e.payload)),
   onNavigate: (cb: (page: string) => void): Promise<UnlistenFn> => listen<string>("navigate", (e) => cb(e.payload)),
 };

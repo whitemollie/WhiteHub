@@ -13,6 +13,9 @@ use windows_sys::Win32::{
 pub const GLYPH_MOUSE: char = '\u{E962}';
 pub const GLYPH_HEADPHONE: char = '\u{E7F6}';
 pub const GLYPH_HEADSET: char = '\u{E95B}';
+pub const GLYPH_KEYBOARD: char = '\u{E765}';
+pub const GLYPH_GAMEPAD: char = '\u{E7FC}';
+pub const GLYPH_BLUETOOTH: char = '\u{E702}';
 /// Filled charging bolt (iOS-style): outline in a unit box, width/height = BOLT_ASPECT.
 const BOLT: [(f32, f32); 6] = [(0.72, 0.0), (0.02, 0.58), (0.45, 0.58), (0.28, 1.0), (0.98, 0.42), (0.55, 0.42)];
 const BOLT_ASPECT: f32 = 0.62;
@@ -437,6 +440,9 @@ mod tests {
         let items = [
             StripItem { glyph: Some(GLYPH_MOUSE), label: "M".into(), text: "58%".into(), color: None, dim: false, charging: false, tooltip: String::new() },
             StripItem { glyph: Some(GLYPH_HEADPHONE), label: "H".into(), text: "45%".into(), color: None, dim: false, charging: true, tooltip: String::new() },
+            StripItem { glyph: Some(GLYPH_KEYBOARD), label: "K".into(), text: "91%".into(), color: None, dim: false, charging: false, tooltip: String::new() },
+            StripItem { glyph: Some(GLYPH_GAMEPAD), label: "G".into(), text: "Full".into(), color: None, dim: false, charging: false, tooltip: String::new() },
+            StripItem { glyph: Some(GLYPH_BLUETOOTH), label: "B".into(), text: "52%".into(), color: None, dim: false, charging: false, tooltip: String::new() },
         ];
         let scale: f32 = std::env::var("WHITEHUB_PREVIEW_SCALE").ok().and_then(|v| v.parse().ok()).unwrap_or(1.5);
         let r = render_strip(&items, (48.0 * scale) as u32, scale, [255, 255, 255]).unwrap();

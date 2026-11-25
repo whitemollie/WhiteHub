@@ -5,8 +5,10 @@
 //! panics only affects its own snapshot.
 use super::{
     now_ms,
-    provider::{EventSource, Outcome, Poll, Provider},
-    DeviceSnapshot, Status,
+    provider::{EventSource, Found, Outcome, Poll, Provider},
+    report,
+    scanner::{connection_of, Reading, Scanned, Scanner},
+    DeviceKind, DeviceSnapshot, Status,
 };
 use crate::settings::{DeviceSettings, Settings};
 use hidapi::HidApi;
@@ -23,6 +25,7 @@ use std::{
 const RETRY_STEPS: [u64; 5] = [30, 60, 120, 300, 600];
 const RESCAN_DEBOUNCE: Duration = Duration::from_millis(1500);
 const RESUME_DELAY: Duration = Duration::from_secs(5);
+const MAX_SLOTS: usize = 64;
 const IDLE_WAIT: Duration = Duration::from_secs(3600);
 /// Low-battery alerts re-arm only after the level climbs this far above the threshold.
 const LOW_HYSTERESIS: u8 = 5;
@@ -39,6 +42,10 @@ pub enum Cmd {
     Configure(Box<Settings>),
     /// Poll one device after a short delay (pushed device event).
     RefreshIn(&'static str, Duration),
+    /// Drop a discovered device that is not connected.
+    Forget(String),
+    /// Describe connected hardware for a device request.
+    Report(Sender<String>),
     /// A device event listener stopped (device unplugged).
     ListenerEnded(&'static str),
     Shutdown,
@@ -46,9 +53,10 @@ pub enum Cmd {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
-    Connected { id: &'static str, name: String },
-    Disconnected { id: &'static str, name: String },
-    Low { id: &'static str, name: String, percent: u8 },
+    Connected { id: String, name: String },
+    Disconnected { id: String, name: String },
+    /// `level` is ready to show, e.g. "12%" or "Low".
+    Low { id: String, name: String, level: String },
 }
 
 pub type Publish = Box<dyn Fn(&[DeviceSnapshot], Vec<Event>) + Send>;
@@ -60,20 +68,27 @@ pub struct Manager {
 }
 
 impl Manager {
-    pub fn start(providers: Vec<Box<dyn Provider>>, settings: &Settings, publish: Publish) -> Self {
+    pub fn start(providers: Vec<Box<dyn Provider>>, scanners: Vec<Box<dyn Scanner>>, settings: &Settings, publish: Publish) -> Self {
         let interval = interval_of(settings);
-        let slots: Vec<Slot> = providers.into_iter().map(|p| Slot::new(p, settings)).collect();
+        let mut slots: Vec<Slot> = providers.into_iter().map(|p| Slot::new(p, settings)).collect();
+        // Devices remembered from earlier runs stay listed until they are seen again or forgotten.
+        for (id, cfg) in &settings.devices {
+            if let (Some(_), Some(known)) = (connection_of(id), &cfg.known) {
+                slots.push(Slot::discovered(id.clone(), known.name.clone(), known.kind, cfg.clone()));
+            }
+        }
         let snapshots = Arc::new(Mutex::new(slots.iter().map(|s| s.snap.clone()).collect()));
+        let settings = settings.clone();
         let (tx, rx) = channel();
         let shared = snapshots.clone();
         let worker_tx = tx.clone();
         let thread = std::thread::Builder::new()
             .name("battery-manager".into())
             .spawn(move || {
-                let mut w = Worker { slots, interval, api: None, rescan_at: None, publish, shared, tx: worker_tx };
+                let mut w = Worker { slots, scanners, settings, scan_due: Some(Instant::now()), interval, api: None, rescan_at: None, publish, shared, tx: worker_tx };
                 loop {
                     let now = Instant::now();
-                    let wake = w.slots.iter().filter_map(|s| s.next_due).chain(w.rescan_at).min();
+                    let wake = w.slots.iter().filter_map(|s| s.next_due).chain(w.rescan_at).chain(w.scan_due).min();
                     let timeout = wake.map_or(IDLE_WAIT, |t| t.saturating_duration_since(now));
                     match rx.recv_timeout(timeout) {
                         Ok(Cmd::Shutdown) | Err(RecvTimeoutError::Disconnected) => break,
@@ -120,7 +135,10 @@ pub fn retry_delay(failures: u32, interval: Duration) -> Duration {
 }
 
 struct Slot {
-    provider: Box<dyn Provider>,
+    /// `None` for devices found by a scanner.
+    provider: Option<Box<dyn Provider>>,
+    detected_kind: DeviceKind,
+    default_connection: &'static str,
     cfg: DeviceSettings,
     snap: DeviceSnapshot,
     next_due: Option<Instant>,
@@ -138,13 +156,35 @@ impl Slot {
     fn new(mut provider: Box<dyn Provider>, settings: &Settings) -> Self {
         let cfg = settings.device(provider.id());
         provider.set_product_filter(parse_pid(&cfg.product_id));
+        let mut slot = Self::blank(provider.id().into(), provider.default_name().into(), provider.kind(), provider.connection(), cfg);
+        slot.next_due = slot.cfg.enabled.then(Instant::now);
+        slot.provider = Some(provider);
+        slot
+    }
+
+    fn discovered(id: String, name: String, kind: DeviceKind, cfg: DeviceSettings) -> Self {
+        let connection = connection_of(&id).unwrap_or("");
+        let mut slot = Self::blank(id, name, kind, connection, cfg);
+        slot.snap.known = true;
+        slot.snap.discovered = true;
+        if slot.cfg.enabled {
+            slot.snap.status = Status::Disconnected;
+        }
+        slot
+    }
+
+    fn blank(id: String, default_name: String, kind: DeviceKind, connection: &'static str, cfg: DeviceSettings) -> Self {
         let snap = DeviceSnapshot {
-            id: provider.id(),
-            name: cfg.name.clone().unwrap_or_else(|| provider.default_name().into()),
-            kind: provider.kind(),
-            connection: provider.connection(),
+            id,
+            name: cfg.name.clone().unwrap_or_else(|| default_name.clone()),
+            default_name,
+            known: cfg.known.is_some(),
+            discovered: false,
+            kind: cfg.kind.unwrap_or(kind),
+            connection,
             status: if cfg.enabled { Status::Unknown } else { Status::Disabled },
             percent: None,
+            level: None,
             charging: false,
             millivolts: None,
             last_update: None,
@@ -155,25 +195,26 @@ impl Slot {
             error: None,
             enabled: cfg.enabled,
         };
-        let next_due = cfg.enabled.then(Instant::now);
-        Self { provider, cfg, snap, next_due, last_poll: None, failures: 0, linked: None, low_alerted: false, signature: String::new(), listening: false }
+        Self { provider: None, detected_kind: kind, default_connection: connection, cfg, snap, next_due: None, last_poll: None, failures: 0, linked: None, low_alerted: false, signature: String::new(), listening: false }
     }
 
     /// Folds a poll result into the snapshot; returns notification events and the next delay.
     fn apply(&mut self, poll: Poll, now: u64, interval: Duration) -> (Vec<Event>, Duration) {
         let s = &mut self.snap;
-        let before = (s.status, s.percent);
+        let before = (s.status, s.percent, s.level);
         s.last_attempt = Some(now);
         if let Some(f) = &poll.found {
             s.hardware = Some(f.hardware.clone());
             s.product = Some(f.product.clone());
             s.source = f.source.clone();
-            s.connection = f.connection.unwrap_or_else(|| self.provider.connection());
+            s.connection = f.connection.unwrap_or(self.default_connection);
+            s.known = true;
         }
         let delay = match &poll.outcome {
             Outcome::Battery { percent, charging, millivolts } => {
                 s.status = Status::Online;
                 s.percent = Some(*percent);
+                s.level = None;
                 s.charging = *charging;
                 s.millivolts = *millivolts;
                 s.last_update = Some(now);
@@ -181,9 +222,19 @@ impl Slot {
                 self.failures = 0;
                 interval
             }
+            Outcome::Step(level) => {
+                s.status = Status::Online;
+                s.percent = None;
+                s.level = Some(*level);
+                s.charging = false;
+                s.last_update = Some(now);
+                s.error = None;
+                self.failures = 0;
+                interval
+            }
             Outcome::NotFound => {
                 s.status = Status::Disconnected;
-                s.connection = self.provider.connection();
+                s.connection = self.default_connection;
                 s.charging = false;
                 s.hardware = None;
                 s.error = None;
@@ -206,8 +257,9 @@ impl Slot {
                 retry_delay(self.failures, interval)
             }
         };
-        if (s.status, s.percent) != before {
+        if (s.status, s.percent, s.level) != before {
             match (s.status, s.percent) {
+                (Status::Online, None) => log::info!("[{}] battery {:?}", s.id, s.level),
                 (Status::Online, Some(p)) => log::info!("[{}] battery {p}%{}", s.id, if s.charging { " (charging)" } else { "" }),
                 (Status::Error, _) => log::warn!("[{}] error: {}", s.id, s.error.as_deref().unwrap_or("")),
                 (st, _) => log::info!("[{}] status {st:?}", s.id),
@@ -219,37 +271,59 @@ impl Slot {
         if let Some(linked) = s.status.linked() {
             if self.linked.is_some_and(|was| was != linked) {
                 events.push(if linked {
-                    Event::Connected { id: s.id, name: name.clone() }
+                    Event::Connected { id: s.id.clone(), name: name.clone() }
                 } else {
-                    Event::Disconnected { id: s.id, name: name.clone() }
+                    Event::Disconnected { id: s.id.clone(), name: name.clone() }
                 });
             }
             self.linked = Some(linked);
         }
-        if let (Outcome::Battery { percent, charging, .. }, true) = (&poll.outcome, self.cfg.notify_low) {
-            let threshold = self.cfg.low_threshold;
-            if *percent <= threshold && !charging {
+        // (is low, has recovered, text)
+        let state = match &poll.outcome {
+            Outcome::Battery { percent, charging, .. } => {
+                let threshold = self.cfg.low_threshold;
+                Some((*percent <= threshold && !charging, *charging || *percent >= threshold.saturating_add(LOW_HYSTERESIS), format!("{percent}%")))
+            }
+            Outcome::Step(level) => Some((level.is_low(), !level.is_low(), level.label().to_owned())),
+            _ => None,
+        };
+        if let (Some((low, recovered, level)), true) = (state, self.cfg.notify_low) {
+            if low {
                 if !self.low_alerted {
-                    events.push(Event::Low { id: s.id, name, percent: *percent });
+                    events.push(Event::Low { id: s.id.clone(), name, level });
                 }
                 self.low_alerted = true;
-            } else if *charging || *percent >= threshold.saturating_add(LOW_HYSTERESIS) {
+            } else if recovered {
                 self.low_alerted = false;
             }
         }
         (events, delay)
     }
 
+    /// Follows a name or type that changed in Windows.
+    fn rename(&mut self, name: &str, kind: DeviceKind) {
+        self.detected_kind = kind;
+        self.snap.kind = self.cfg.kind.unwrap_or(kind);
+        if self.snap.default_name != name {
+            self.snap.default_name = name.to_owned();
+            self.snap.name = self.cfg.name.clone().unwrap_or_else(|| name.to_owned());
+        }
+    }
+
     fn configure(&mut self, cfg: DeviceSettings, interval: Duration, now: Instant) {
         let was_enabled = self.cfg.enabled;
         if cfg.product_id != self.cfg.product_id {
-            self.provider.set_product_filter(parse_pid(&cfg.product_id));
-            self.next_due = Some(now);
+            if let Some(p) = &mut self.provider {
+                p.set_product_filter(parse_pid(&cfg.product_id));
+                self.next_due = Some(now);
+            }
         }
         if cfg.low_threshold != self.cfg.low_threshold {
             self.low_alerted = false;
         }
-        self.snap.name = cfg.name.clone().unwrap_or_else(|| self.provider.default_name().into());
+        self.snap.name = cfg.name.clone().unwrap_or_else(|| self.snap.default_name.clone());
+        self.snap.kind = cfg.kind.unwrap_or(self.detected_kind);
+        self.snap.known |= cfg.known.is_some();
         self.snap.enabled = cfg.enabled;
         match (was_enabled, cfg.enabled) {
             (true, false) => {
@@ -259,7 +333,8 @@ impl Slot {
             }
             (false, true) => {
                 self.snap.status = Status::Unknown;
-                self.next_due = Some(now);
+                // Discovered devices are refreshed by the next scan.
+                self.next_due = self.provider.is_some().then_some(now);
             }
             (true, true) if self.failures == 0 => {
                 // Interval change: keep the cadence relative to the last poll.
@@ -275,6 +350,10 @@ impl Slot {
 
 struct Worker {
     slots: Vec<Slot>,
+    scanners: Vec<Box<dyn Scanner>>,
+    scan_due: Option<Instant>,
+    /// Current settings, needed for devices that appear later.
+    settings: Settings,
     interval: Duration,
     api: Option<HidApi>,
     rescan_at: Option<Instant>,
@@ -332,11 +411,20 @@ impl Worker {
         match cmd {
             Cmd::Refresh(id) => {
                 for s in self.slots.iter_mut().filter(|s| s.cfg.enabled && id.as_deref().map_or(true, |id| id == s.snap.id)) {
-                    s.next_due = Some(now);
+                    if s.provider.is_some() {
+                        s.next_due = Some(now);
+                    } else {
+                        self.scan_due = Some(now);
+                    }
+                }
+                if id.is_none() {
+                    self.scan_due = Some(now);
                 }
             }
             Cmd::RefreshIfStale(age) => {
-                for s in self.slots.iter_mut().filter(|s| s.cfg.enabled) {
+                // Reading what Windows already knows is cheap and sends nothing to the devices.
+                self.scan_due = Some(now);
+                for s in self.slots.iter_mut().filter(|s| s.cfg.enabled && s.provider.is_some()) {
                     if s.last_poll.map_or(true, |t| now.duration_since(t) >= age) {
                         s.next_due = Some(now);
                     }
@@ -346,16 +434,19 @@ impl Worker {
             Cmd::Resumed => {
                 log::info!("[battery] system resumed, re-reading devices");
                 self.api = None; // handles may be stale after sleep; enumerate from scratch
-                for s in self.slots.iter_mut().filter(|s| s.cfg.enabled) {
+                self.scan_due = Some(now + RESUME_DELAY);
+                for s in self.slots.iter_mut().filter(|s| s.cfg.enabled && s.provider.is_some()) {
                     s.next_due = Some(now + RESUME_DELAY);
                 }
             }
             Cmd::Configure(settings) => {
                 self.interval = interval_of(&settings);
                 for s in &mut self.slots {
-                    let cfg = settings.device(s.snap.id);
+                    let cfg = settings.device(&s.snap.id);
                     s.configure(cfg, self.interval, now);
                 }
+                self.settings = *settings;
+                self.scan_due = Some(now);
                 self.publish(Vec::new());
             }
             Cmd::RefreshIn(id, delay) => {
@@ -363,6 +454,21 @@ impl Worker {
                     let at = now + delay;
                     s.next_due = Some(s.next_due.map_or(at, |d| d.min(at)));
                 }
+            }
+            Cmd::Forget(id) => {
+                self.slots.retain(|s| s.snap.id != id || s.provider.is_some() || s.snap.status == Status::Online);
+                if !self.slots.iter().any(|s| s.snap.id == id) {
+                    self.settings.devices.remove(&id);
+                }
+                self.publish(Vec::new());
+            }
+            Cmd::Report(reply) => {
+                let hid = match self.ensure_api() {
+                    Ok(()) => self.api.as_ref().map(report::describe_hid).unwrap_or_default(),
+                    Err(e) => format!("HID unavailable: {e}\n"),
+                };
+                let found: Vec<Scanned> = self.scan_all();
+                let _ = reply.send(hid + &report::describe_scanned(&found));
             }
             Cmd::ListenerEnded(id) => {
                 if let Some(s) = self.slots.iter_mut().find(|s| s.snap.id == id) {
@@ -388,10 +494,12 @@ impl Worker {
         let now = Instant::now();
         if self.rescan_at.is_some_and(|t| t <= now) {
             self.rescan_at = None;
+            // A Bluetooth device or controller may have come or gone as well.
+            self.scan_due = Some(now);
             if self.ensure_api().is_ok() {
                 let api = self.api.as_ref().expect("api");
-                let sigs: Vec<String> = self.slots.iter().map(|s| s.provider.signature(api)).collect();
-                for (s, sig) in self.slots.iter_mut().zip(sigs) {
+                for s in &mut self.slots {
+                    let Some(sig) = s.provider.as_ref().map(|p| p.signature(api)) else { continue };
                     // Receiver plugged/removed, or the mouse appeared on its charging cable.
                     if s.cfg.enabled && (sig != s.signature || s.snap.status == Status::Unknown) {
                         log::info!("[{}] USB devices changed: [{}] -> [{}]", s.snap.id, s.signature, sig);
@@ -402,18 +510,31 @@ impl Worker {
             }
         }
         let due: Vec<usize> = (0..self.slots.len()).filter(|&i| self.slots[i].next_due.is_some_and(|t| t <= now)).collect();
-        if due.is_empty() {
+        let scan = self.scan_due.is_some_and(|t| t <= now);
+        if due.is_empty() && !scan {
             return;
         }
         let interval = self.interval;
         let mut events = Vec::new();
+        if scan {
+            self.scan_due = Some(now + interval);
+            events.extend(self.scan());
+        }
+        if due.is_empty() {
+            self.publish(events);
+            return;
+        }
         match self.ensure_api() {
             Ok(_) => {
                 for i in due {
                     let api = self.api.as_ref().expect("api");
                     let slot = &mut self.slots[i];
+                    let Some(provider) = &mut slot.provider else {
+                        slot.next_due = None;
+                        continue;
+                    };
                     let started = Instant::now();
-                    let poll = catch_unwind(AssertUnwindSafe(|| slot.provider.poll(api))).unwrap_or_else(|_| {
+                    let poll = catch_unwind(AssertUnwindSafe(|| provider.poll(api))).unwrap_or_else(|_| {
                         log::error!("[{}] provider panicked", slot.snap.id);
                         Poll { found: None, outcome: Outcome::Failed("internal provider error".into()) }
                     });
@@ -421,11 +542,12 @@ impl Worker {
                     let (ev, delay) = slot.apply(poll, now_ms(), interval);
                     slot.last_poll = Some(Instant::now());
                     slot.next_due = Some(Instant::now() + delay);
-                    slot.signature = slot.provider.signature(api);
                     events.extend(ev);
+                    let Some(provider) = &slot.provider else { continue };
+                    slot.signature = provider.signature(api);
                     if !slot.listening && matches!(slot.snap.status, Status::Online | Status::Off) {
-                        if let Some(src) = slot.provider.event_source(api) {
-                            slot.listening = spawn_listener(slot.snap.id, src, self.tx.clone());
+                        if let Some(src) = provider.event_source(api) {
+                            slot.listening = spawn_listener(provider.id(), src, self.tx.clone());
                         }
                     }
                 }
@@ -443,8 +565,52 @@ impl Worker {
         self.publish(events);
     }
 
+    fn scan_all(&mut self) -> Vec<Scanned> {
+        let mut all = Vec::new();
+        for s in &mut self.scanners {
+            match catch_unwind(AssertUnwindSafe(|| s.scan(&all))) {
+                Ok(found) => all.extend(found),
+                Err(_) => log::error!("[{}] scanner panicked", s.prefix()),
+            }
+        }
+        all
+    }
+
+    /// Updates discovered devices; devices that show a battery level for the first time are added.
+    fn scan(&mut self) -> Vec<Event> {
+        let started = Instant::now();
+        let found = self.scan_all();
+        log::debug!("[scan] {} devices in {} ms", found.len(), started.elapsed().as_millis());
+        for f in found.iter().filter(|f| f.connected && f.reading.is_some()) {
+            if self.slots.len() < MAX_SLOTS && !self.slots.iter().any(|s| s.snap.id == f.id) {
+                log::info!("[scan] new device {} ({:?})", f.id, f.kind);
+                self.slots.push(Slot::discovered(f.id.clone(), f.name.clone(), f.kind, self.settings.device(&f.id)));
+            }
+        }
+        let mut events = Vec::new();
+        for slot in self.slots.iter_mut().filter(|s| s.provider.is_none() && s.cfg.enabled) {
+            let source = self.scanners.iter().find(|s| slot.snap.id.starts_with(s.prefix())).map_or("", |s| s.source());
+            let poll = match found.iter().find(|f| f.id == slot.snap.id) {
+                Some(f) if f.connected => {
+                    slot.rename(&f.name, f.kind);
+                    let outcome = match f.reading {
+                        Some(Reading::Percent(percent)) => Outcome::Battery { percent, charging: false, millivolts: None },
+                        Some(Reading::Step(level)) => Outcome::Step(level),
+                        None => Outcome::Asleep,
+                    };
+                    Poll { found: Some(Found { product: f.name.clone(), hardware: String::new(), source: source.into(), connection: None }), outcome }
+                }
+                _ => Poll::not_found(),
+            };
+            events.extend(slot.apply(poll, now_ms(), self.interval).0);
+            slot.snap.hardware = None;
+        }
+        events
+    }
+
     fn publish(&self, events: Vec<Event>) {
-        let snaps: Vec<DeviceSnapshot> = self.slots.iter().map(|s| s.snap.clone()).collect();
+        let mut snaps: Vec<DeviceSnapshot> = self.slots.iter().map(|s| s.snap.clone()).collect();
+        snaps.sort_by(|a, b| (a.kind, a.discovered, &a.id).cmp(&(b.kind, b.discovered, &b.id)));
         if let Ok(mut shared) = self.shared.lock() {
             *shared = snaps.clone();
         }
@@ -568,6 +734,82 @@ mod tests {
         assert!(!event_due(Some(t), t + Duration::from_millis(999)));
         assert!(event_due(Some(t), t + EVENT_MIN_GAP));
         assert!(EVENT_SETTLE > EVENT_MIN_GAP, "a dropped event is covered by the pending poll");
+    }
+
+    struct FakeScanner(Arc<Mutex<Vec<Scanned>>>);
+    impl Scanner for FakeScanner {
+        fn prefix(&self) -> &'static str {
+            "bt:"
+        }
+        fn source(&self) -> &'static str {
+            "test"
+        }
+        fn scan(&mut self, _: &[Scanned]) -> Vec<Scanned> {
+            self.0.lock().unwrap().clone()
+        }
+    }
+
+    fn worker(found: Arc<Mutex<Vec<Scanned>>>) -> Worker {
+        Worker {
+            slots: Vec::new(),
+            scanners: vec![Box::new(FakeScanner(found))],
+            scan_due: None,
+            settings: Settings::default(),
+            interval: MIN5,
+            api: None,
+            rescan_at: None,
+            publish: Box::new(|_, _| {}),
+            shared: Arc::new(Mutex::new(Vec::new())),
+            tx: channel().0,
+        }
+    }
+
+    fn earbuds(connected: bool, reading: Option<Reading>) -> Scanned {
+        Scanned { id: "bt:1".into(), name: "Earbuds".into(), kind: DeviceKind::Headset, connected, reading }
+    }
+
+    #[test]
+    fn discovered_devices_come_and_go() {
+        let found = Arc::new(Mutex::new(vec![earbuds(false, Some(Reading::Percent(70)))]));
+        let mut w = worker(found.clone());
+        w.scan();
+        assert!(w.slots.is_empty(), "a device that is not connected is not added");
+        *found.lock().unwrap() = vec![earbuds(true, Some(Reading::Percent(70)))];
+        assert!(w.scan().is_empty(), "no notification for the first sight");
+        assert_eq!((w.slots[0].snap.status, w.slots[0].snap.percent, w.slots[0].snap.known), (Status::Online, Some(70), true));
+        *found.lock().unwrap() = Vec::new();
+        assert!(matches!(w.scan().as_slice(), [Event::Disconnected { .. }]));
+        assert_eq!((w.slots[0].snap.status, w.slots[0].snap.percent), (Status::Disconnected, Some(70)), "last value is kept");
+        *found.lock().unwrap() = vec![earbuds(true, None)];
+        w.scan();
+        assert_eq!((w.slots[0].snap.status, w.slots[0].snap.percent), (Status::Asleep, Some(70)), "no level means no invented value");
+    }
+
+    #[test]
+    fn only_absent_discovered_devices_can_be_forgotten() {
+        let found = Arc::new(Mutex::new(vec![earbuds(true, Some(Reading::Percent(70)))]));
+        let mut w = worker(found.clone());
+        w.slots.push(slot());
+        w.scan();
+        w.handle(Cmd::Forget("bt:1".into()));
+        w.handle(Cmd::Forget("wlmouse".into()));
+        assert_eq!(w.slots.len(), 2, "connected and built-in devices stay");
+        found.lock().unwrap().clear();
+        w.scan();
+        w.handle(Cmd::Forget("bt:1".into()));
+        assert_eq!(w.slots.len(), 1);
+    }
+
+    #[test]
+    fn coarse_levels_alert_once() {
+        use crate::battery::Level;
+        let mut s = slot();
+        let low = |s: &mut Slot, l| s.apply(outcome(Outcome::Step(l)), 0, MIN5).0.len();
+        assert_eq!(low(&mut s, Level::Medium), 0);
+        assert_eq!(low(&mut s, Level::Low), 1);
+        assert_eq!(low(&mut s, Level::Empty), 0);
+        assert_eq!(low(&mut s, Level::Full), 0);
+        assert_eq!((s.snap.percent, s.snap.level), (None, Some(Level::Full)));
     }
 
     #[test]

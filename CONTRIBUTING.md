@@ -18,7 +18,7 @@ npm run tauri build                                # release build and installer
 Protocols of the supported devices: [docs/PROTOCOLS.md](docs/PROTOCOLS.md).
 
 1. Implement `battery::provider::Provider` in a new module under `src-tauri/src/battery`.
-2. Register it in `app.rs` and add its ID to `settings::DEVICE_IDS`.
+2. Register it in `app.rs` and add its ID to `settings::DEVICE_IDS`. For a source that finds many devices by itself, implement `battery::scanner::Scanner` instead.
 3. Match exact USB IDs, send read-only queries only, and validate every reply. Never probe unknown devices.
 4. Add unit tests with replies captured from real hardware, without serial numbers.
 

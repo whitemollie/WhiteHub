@@ -8,7 +8,7 @@
 
 Без фирменных программ в фоне. Без драйверов. Без доступа в сеть.
 
-![Release](https://img.shields.io/badge/release-v0.1.9-0078D4?style=flat-square)
+![Release](https://img.shields.io/badge/release-v0.2.0-0078D4?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?style=flat-square)
 ![License](https://img.shields.io/badge/license-GPL--3.0-22C55E?style=flat-square)
 [![CI](https://github.com/whitemollie/WhiteHub/actions/workflows/ci.yml/badge.svg)](https://github.com/whitemollie/WhiteHub/actions/workflows/ci.yml)
@@ -34,6 +34,7 @@
 
 | Возможность | Что это даёт |
 |---|---|
+| **Находит само** | Подключите поддерживаемое устройство — оно появится, настраивать нечего |
 | **Всегда на виду** | Заряд рядом с часами, другие программы открывать не нужно |
 | **Зарядка** | Молния появляется, когда устройство подключено кабелем |
 | **Уведомления** | Низкий заряд, подключение и отключение, режим «Не беспокоить» |
@@ -59,22 +60,24 @@
 
 1. Скачайте `WhiteHub_x.y.z_x64-setup.exe` со страницы [Releases](../../releases).
 2. Запустите. Установка идёт только для вашего пользователя, права администратора не нужны.
-3. Подключите [поддерживаемое устройство](#устройства). Заряд появится на панели задач.
+3. Подключите [поддерживаемое устройство](#устройства). Заряд сам появится на панели задач.
 
 > [!NOTE]
 > Установщик не подписан, поэтому Windows SmartScreen может предупредить о неизвестном издателе.
 
 ## Устройства
 
-| Устройство | USB-приёмник | Статус |
+| Устройство | Подключение | Статус |
 |---|---|---|
-| WLmouse Beast G | `36A7:A860`, кабель `36A7:A861` | Проверено |
-| HyperX Cloud III **S** Wireless | `03F0:06BE` | Проверено |
-| HyperX Cloud III S Wireless, другой донгл | `03F0:02CC` | Не проверено |
+| Любое Bluetooth-устройство, чей заряд показывает Windows | Bluetooth | Проверено с мышью |
+| WLmouse Beast G | 2.4 GHz `36A7:A860`, кабель `36A7:A861` | Проверено |
+| HyperX Cloud III **S** Wireless | 2.4 GHz `03F0:06BE` | Проверено |
+| HyperX Cloud III S Wireless, другой донгл | 2.4 GHz `03F0:02CC` | Не проверено |
+| Беспроводные геймпады Xbox (заряд ступенями) | XInput | Не проверено |
 | Другие мыши WLmouse | Product ID вручную | Не проверено |
 
 > [!IMPORTANT]
-> WhiteHub не универсальный: у каждого производителя свой протокол. Другие мыши, гарнитуры, клавиатуры и Bluetooth пока не поддерживаются. Нет вашего устройства? [Запросите его](../../issues/new?template=device-request.yml).
+> Устройствам с собственным донглом 2.4 GHz нужна поддержка именно их модели: у каждого производителя свой протокол. Нет вашего? Нажмите **Devices → My device is missing → Create file** и [оставьте заявку](../../issues/new?template=device-request.yml).
 
 ## Вопросы
 
@@ -82,6 +85,12 @@
 <summary><b>Почему у мыши старое значение?</b></summary>
 
 Спящая мышь не отдаёт заряд. WhiteHub показывает последнее известное значение приглушённо и повторяет запрос. Подвигайте мышью и нажмите **Refresh now**.
+</details>
+
+<details>
+<summary><b>Какие Bluetooth-устройства работают?</b></summary>
+
+Те, чей заряд сама Windows показывает в *Параметры → Bluetooth и устройства*. WhiteHub читает это число и ничего не отправляет устройству. Это свойство Windows официально не документировано.
 </details>
 
 <details>
@@ -116,7 +125,7 @@ Windows прячет новые иконки под `^`. Включите её: 
 
 ## Приватность
 
-WhiteHub отправляет только запросы на чтение заряда, и только перечисленным выше USB-устройствам или тому, которое вы сами указали по Product ID. Настройки лежат в `%APPDATA%\com.whitehub.desktop`, логи — в `%LOCALAPPDATA%\com.whitehub.desktop`. Об уязвимостях: [SECURITY.md](SECURITY.md).
+WhiteHub отправляет только запросы на чтение заряда, и только перечисленным выше USB-приёмникам или тому, который вы сами указали по Product ID. Заряд Bluetooth-устройств берётся у Windows. Настройки лежат в `%APPDATA%\com.whitehub.desktop`, логи — в `%LOCALAPPDATA%\com.whitehub.desktop`. Об уязвимостях: [SECURITY.md](SECURITY.md).
 
 ## Для разработчиков
 

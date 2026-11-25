@@ -28,6 +28,26 @@ export const MouseIcon = (p: P) => (
   </Svg>
 );
 
+export const KeyboardIcon = (p: P) => (
+  <Svg {...p}>
+    <rect x="2" y="6" width="20" height="12" rx="2.5" />
+    <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" />
+  </Svg>
+);
+
+export const GamepadIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M7.5 7h9a5.5 5.5 0 0 1 5.4 6.6l-.5 2.6a2.6 2.6 0 0 1-4.6 1L15 15H9l-1.8 2.2a2.6 2.6 0 0 1-4.6-1l-.5-2.6A5.5 5.5 0 0 1 7.5 7z" />
+    <path d="M8 9.5v3M6.5 11h3M15.5 10h.01M17.5 12h.01" />
+  </Svg>
+);
+
+export const BluetoothIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="m7 7 10 10-5 5V2l5 5L7 17" />
+  </Svg>
+);
+
 export const HeadphonesIcon = (p: P) => (
   <Svg {...p}>
     <path d="M3 18v-6a9 9 0 0 1 18 0v6" />

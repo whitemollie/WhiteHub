@@ -28,6 +28,12 @@ export async function load() {
     setNow(Date.now());
     setState("devices", reconcile(d, { key: "id" }));
   });
+  // The app adds newly found devices; take only those over, so unsaved edits are not lost.
+  api.onSettings((s) => {
+    for (const [id, d] of Object.entries(s.devices)) {
+      if (!state.settings?.devices[id]) setState("settings", "devices", id, d);
+    }
+  });
   api.onNavigate((p) => PAGES.includes(p as Page) && navigate(p as Page));
   setInterval(() => setNow(Date.now()), 30_000);
 }
@@ -48,6 +54,15 @@ export function updateSettings(fn: (s: Settings) => void, delay = 250) {
       setSaveError(String(e));
     }
   }, delay);
+}
+
+export async function forgetDevice(id: string) {
+  try {
+    const saved = await api.forgetDevice(id);
+    setState("settings", reconcile(saved));
+  } catch (e) {
+    setSaveError(String(e));
+  }
 }
 
 export function navigate(p: Page) {

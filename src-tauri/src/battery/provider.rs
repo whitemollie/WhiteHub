@@ -1,5 +1,5 @@
 //! Common interface implemented by every device provider.
-use super::DeviceKind;
+use super::{DeviceKind, Level};
 use hidapi::{HidApi, HidDevice};
 
 /// The receiver (or cable connection) a provider found during a poll.
@@ -18,6 +18,8 @@ pub struct Found {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Outcome {
     Battery { percent: u8, charging: bool, millivolts: Option<u16> },
+    /// Only a coarse battery step is known.
+    Step(Level),
     Asleep,
     Off,
     /// No matching receiver is plugged in.

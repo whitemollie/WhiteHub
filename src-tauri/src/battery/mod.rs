@@ -1,16 +1,49 @@
 //! Battery monitoring: device providers and the polling manager.
+pub mod bluetooth;
 pub mod hyperx;
 pub mod manager;
 pub mod provider;
+pub mod report;
+pub mod scanner;
 pub mod wlmouse;
+pub mod xinput;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+/// Declaration order is display order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum DeviceKind {
     Mouse,
+    Keyboard,
     Headset,
+    Gamepad,
+    #[default]
+    Other,
+}
+
+/// Battery step of devices that do not report a percentage.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Level {
+    Empty,
+    Low,
+    Medium,
+    Full,
+}
+
+impl Level {
+    pub fn label(self) -> &'static str {
+        match self {
+            Level::Empty => "Empty",
+            Level::Low => "Low",
+            Level::Medium => "Med",
+            Level::Full => "Full",
+        }
+    }
+    pub fn is_low(self) -> bool {
+        matches!(self, Level::Empty | Level::Low)
+    }
 }
 
 /// What WhiteHub currently knows about a device's link.
@@ -48,13 +81,21 @@ impl Status {
 #[derive(Clone, Debug, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceSnapshot {
-    pub id: &'static str,
+    pub id: String,
     pub name: String,
+    /// Name without the user's override.
+    pub default_name: String,
+    /// Has been present at least once; unknown devices are not shown.
+    pub known: bool,
+    /// Found by a scanner (Bluetooth, controllers) rather than by a fixed provider.
+    pub discovered: bool,
     pub kind: DeviceKind,
     pub connection: &'static str,
     pub status: Status,
     /// Last known battery level; kept while the device is unreachable.
     pub percent: Option<u8>,
+    /// Battery step, for devices without a percentage.
+    pub level: Option<Level>,
     pub charging: bool,
     pub millivolts: Option<u16>,
     /// Unix milliseconds of the last successful battery read.

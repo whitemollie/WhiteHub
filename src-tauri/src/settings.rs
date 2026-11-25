@@ -3,6 +3,7 @@
 //! Every field has a default (`#[serde(default)]`), so missing or older files load cleanly; values
 //! are clamped by [`Settings::validate`]; a file that cannot be parsed is kept as
 //! `settings.json.bad` and replaced by defaults instead of crashing the app.
+use crate::battery::{scanner, DeviceKind};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -10,7 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub const CURRENT_VERSION: u32 = 1;
+pub const CURRENT_VERSION: u32 = 2;
 pub const POLL_INTERVALS: [u32; 5] = [5, 10, 15, 30, 60];
 pub const DEVICE_IDS: [&str; 2] = [crate::battery::wlmouse::ID, crate::battery::hyperx::ID];
 
@@ -114,6 +115,14 @@ impl Default for Notifications {
     }
 }
 
+/// What is remembered about a device while it is away. Written by the app, not by the UI.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct KnownDevice {
+    pub name: String,
+    pub kind: DeviceKind,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct DeviceSettings {
@@ -127,11 +136,14 @@ pub struct DeviceSettings {
     pub show_in_indicator: bool,
     /// Custom image (data URL, PNG/SVG/JPEG) shown on the dashboard card.
     pub custom_icon: Option<String>,
+    /// Device type chosen by the user, if the detected one is wrong.
+    pub kind: Option<DeviceKind>,
+    pub known: Option<KnownDevice>,
 }
 
 impl Default for DeviceSettings {
     fn default() -> Self {
-        Self { enabled: true, name: None, product_id: None, notify_low: true, low_threshold: 20, show_in_indicator: true, custom_icon: None }
+        Self { enabled: true, name: None, product_id: None, notify_low: true, low_threshold: 20, show_in_indicator: true, custom_icon: None, kind: None, known: None }
     }
 }
 
@@ -178,6 +190,8 @@ impl Default for Settings {
     }
 }
 
+/// Discovered devices remembered at most; more would only be junk.
+const MAX_DISCOVERED: usize = 64;
 const MAX_ICON_BYTES: usize = 512 * 1024;
 const PAGES: [&str; 5] = ["dashboard", "devices", "appearance", "settings", "about"];
 
@@ -216,9 +230,22 @@ impl Settings {
             if slot.is_some() && v.is_none() { fixes.push(format!("invalid colour for {name}")); }
             *slot = v;
         }
-        self.devices.retain(|k, _| DEVICE_IDS.contains(&k.as_str()));
+        let mut discovered = 0;
+        self.devices.retain(|k, _| {
+            if DEVICE_IDS.contains(&k.as_str()) {
+                return true;
+            }
+            let valid = k.len() <= 64 && scanner::connection_of(k).is_some() && k.chars().all(|c| c.is_ascii_alphanumeric() || ":-".contains(c));
+            discovered += usize::from(valid);
+            valid && discovered <= MAX_DISCOVERED
+        });
         for id in DEVICE_IDS {
-            let d = self.devices.entry(id.to_string()).or_default();
+            self.devices.entry(id.to_string()).or_default();
+        }
+        for (id, d) in &mut self.devices {
+            if let Some(k) = &mut d.known {
+                k.name = k.name.chars().filter(|c| !c.is_control()).take(80).collect();
+            }
             d.low_threshold = d.low_threshold.clamp(5, 50);
             if let Some(n) = &d.name {
                 let t: String = n.trim().chars().filter(|c| !c.is_control()).take(40).collect();
@@ -239,6 +266,14 @@ impl Settings {
         }
         self.version = CURRENT_VERSION;
         fixes
+    }
+
+    /// Keeps what the app remembers about devices when the UI saves an older copy.
+    pub fn keep_known(&mut self, old: &Settings) {
+        for (id, o) in &old.devices {
+            let d = self.devices.entry(id.clone()).or_insert_with(|| o.clone());
+            d.known = o.known.clone();
+        }
     }
 
     pub fn device(&self, id: &str) -> DeviceSettings {
@@ -338,6 +373,32 @@ mod tests {
         assert_eq!(s.appearance.colors.card.as_deref(), Some("#aabbcc"));
         assert_eq!(s.devices.len(), 2);
         assert_eq!(s.device(crate::battery::wlmouse::ID).product_id, None);
+    }
+
+    #[test]
+    fn discovered_devices_are_kept_and_limited() {
+        let mut s = Settings::default();
+        for id in ["bt:0f3a-11", "xinput:0", "evil:1", "bt:../x"] {
+            s.devices.insert(id.into(), DeviceSettings::default());
+        }
+        s.validate();
+        assert!(s.devices.contains_key("bt:0f3a-11") && s.devices.contains_key("xinput:0"));
+        assert_eq!(s.devices.len(), 4, "two fixed and two discovered devices");
+        for i in 0..200 {
+            s.devices.insert(format!("bt:{i:04}"), DeviceSettings::default());
+        }
+        s.validate();
+        assert_eq!(s.devices.len(), 2 + MAX_DISCOVERED);
+    }
+
+    #[test]
+    fn ui_cannot_drop_remembered_devices() {
+        let mut old = Settings::default();
+        let known = Some(KnownDevice { name: "Pad".into(), kind: DeviceKind::Gamepad });
+        old.devices.insert("bt:1".into(), DeviceSettings { known: known.clone(), ..Default::default() });
+        let mut new = Settings::default();
+        new.keep_known(&old);
+        assert_eq!(new.device("bt:1").known, known);
     }
 
     #[test]

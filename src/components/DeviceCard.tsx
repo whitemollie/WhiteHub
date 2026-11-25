@@ -1,8 +1,8 @@
-import { Show } from "solid-js";
+import { Match, Show, Switch } from "solid-js";
 import type { Device } from "../app/api";
-import { clock, levelColor, relativeTime, sourceText, statusText, statusTone } from "../app/format";
+import { barPercent, clock, levelColor, relativeTime, sourceText, statusText, statusTone, valueText } from "../app/format";
 import { deviceSettings, now, state } from "../app/store";
-import { BoltIcon, HeadphonesIcon, HeadsetIcon, MouseIcon } from "./Icons";
+import { BluetoothIcon, BoltIcon, GamepadIcon, HeadphonesIcon, HeadsetIcon, KeyboardIcon, MouseIcon } from "./Icons";
 
 export function DeviceGlyph(props: { device: Device; size?: number }) {
   const custom = () => deviceSettings(props.device.id)?.customIcon;
@@ -11,11 +11,22 @@ export function DeviceGlyph(props: { device: Device; size?: number }) {
     <Show
       when={custom()}
       fallback={
-        <Show when={props.device.kind === "headset"} fallback={<MouseIcon size={props.size} />}>
-          <Show when={set() === "alternate"} fallback={<HeadphonesIcon size={props.size} />}>
-            <HeadsetIcon size={props.size} />
-          </Show>
-        </Show>
+        <Switch fallback={<BluetoothIcon size={props.size} />}>
+          <Match when={props.device.kind === "mouse"}>
+            <MouseIcon size={props.size} />
+          </Match>
+          <Match when={props.device.kind === "keyboard"}>
+            <KeyboardIcon size={props.size} />
+          </Match>
+          <Match when={props.device.kind === "gamepad"}>
+            <GamepadIcon size={props.size} />
+          </Match>
+          <Match when={props.device.kind === "headset"}>
+            <Show when={set() === "alternate"} fallback={<HeadphonesIcon size={props.size} />}>
+              <HeadsetIcon size={props.size} />
+            </Show>
+          </Match>
+        </Switch>
       }
     >
       <img src={custom()!} alt="" width={props.size} height={props.size} class="custom-icon" />
@@ -52,7 +63,7 @@ export function DeviceCard(props: { device: Device }) {
       </div>
       <div class="device-level">
         <span class="percent">
-          <Show when={d().percent !== null} fallback={<span class="muted">—</span>}>
+          <Show when={d().percent !== null} fallback={<span classList={{ muted: !d().level }}>{valueText(d()) ?? "—"}</span>}>
             {d().percent}
             <span class="unit">%</span>
           </Show>
@@ -63,7 +74,7 @@ export function DeviceCard(props: { device: Device }) {
           </span>
         </Show>
       </div>
-      <BatteryBar percent={d().percent} dim={!live()} />
+      <BatteryBar percent={barPercent(d())} dim={!live()} />
       <dl class="meta">
         <div>
           <dt>Updated</dt>
@@ -74,8 +85,18 @@ export function DeviceCard(props: { device: Device }) {
           <dd>{sourceText(d())}</dd>
         </div>
         <div>
-          <dt>Receiver</dt>
-          <dd class="mono">{d().hardware ?? "Not found"}</dd>
+          <Show
+            when={d().discovered}
+            fallback={
+              <>
+                <dt>Receiver</dt>
+                <dd class="mono">{d().hardware ?? "Not found"}</dd>
+              </>
+            }
+          >
+            <dt>Connection</dt>
+            <dd>{d().connection}</dd>
+          </Show>
         </div>
       </dl>
       <Show when={d().status === "error" && d().error}>
