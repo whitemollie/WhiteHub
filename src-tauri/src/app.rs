@@ -49,7 +49,7 @@ pub fn run() {
             commands::update_settings,
             commands::default_settings,
             commands::refresh,
-            commands::fit_window,
+            commands::window_ready,
             commands::close_window,
             commands::export_diagnostics,
             commands::open_logs_folder,
@@ -59,12 +59,18 @@ pub fn run() {
             setup(app.handle())?;
             Ok(())
         })
-        .on_window_event(|w, e| {
-            if let WindowEvent::Destroyed = e {
+        .on_window_event(|w, e| match e {
+            // Alt+F4 and WM_CLOSE take the same animated path as the close button.
+            WindowEvent::CloseRequested { api, .. } => {
+                api.prevent_close();
+                window::close(w.app_handle());
+            }
+            WindowEvent::Destroyed => {
+                window::on_destroyed();
                 log::info!("[window] closed, WebView released");
                 trim_memory_later(Duration::from_secs(3));
-                let _ = w;
             }
+            _ => {}
         })
         .build(tauri::generate_context!())
         .expect("failed to build WhiteHub")

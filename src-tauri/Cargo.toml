@@ -1,6 +1,6 @@
 [package]
 name = "whitehub"
-version = "0.1.4"
+version = "0.1.5"
 description = "Lightweight battery monitor for wireless peripherals"
 edition = "2021"
 rust-version = "1.80"
@@ -19,6 +19,7 @@ hidapi = { version = "2", default-features = false, features = ["windows-native"
 ab_glyph = "0.2"
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
+  "Win32_Graphics_Dwm",
   "Win32_Graphics_Gdi",
   "Win32_Security",
   "Win32_Storage_FileSystem",

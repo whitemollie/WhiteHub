@@ -7,7 +7,7 @@ use crate::{
     window,
 };
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State, WebviewWindow};
+use tauri::{AppHandle, Manager, State};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,9 +58,10 @@ pub fn refresh(state: State<'_, AppState>, id: Option<String>) {
     state.manager.send(Cmd::Refresh(id));
 }
 
+/// The page has painted its first frame; the window can be shown.
 #[tauri::command]
-pub fn fit_window(window: WebviewWindow, height: f64) {
-    window::fit_content(&window, height);
+pub fn window_ready(app: AppHandle) {
+    window::reveal(&app, "ready");
 }
 
 #[tauri::command]

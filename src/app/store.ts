@@ -48,6 +48,8 @@ export function updateSettings(fn: (s: Settings) => void, delay = 250) {
 }
 
 export function navigate(p: Page) {
+  // Page transitions only between tabs: the first page must be complete when the window appears.
+  document.documentElement.dataset.live = "";
   setPageSignal(p);
   if (state.settings && state.settings.ui.lastPage !== p) updateSettings((s) => (s.ui.lastPage = p), 600);
 }

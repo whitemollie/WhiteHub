@@ -69,22 +69,6 @@ input {
   display: flex;
   flex-direction: column;
   background: var(--bg);
-  animation: enter 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.shell.closing {
-  animation: leave 140ms ease-in forwards;
-}
-@keyframes enter {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.99);
-  }
-}
-@keyframes leave {
-  to {
-    opacity: 0;
-    transform: translateY(6px) scale(0.99);
-  }
 }
 .titlebar {
   height: 44px;
@@ -111,11 +95,13 @@ input {
   flex: 1;
   min-width: 0;
   overflow-y: auto;
+  /* Reserve the scrollbar on every page so content never shifts sideways between tabs. */
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
 .content-inner {
-  padding: 20px 20px 22px;
+  padding: 20px 10px 22px 20px;
 }
 aside {
   flex: none;
@@ -161,6 +147,8 @@ aside {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+[data-live] .page {
   animation: page 160ms ease-out;
 }
 @keyframes page {

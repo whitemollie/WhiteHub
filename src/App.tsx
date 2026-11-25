@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Match, onCleanup, onMount, Show, Switch } from "solid-js";
+import { createEffect, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
 import { api } from "./app/api";
 import { page, saveError, state } from "./app/store";
 import { applyTheme } from "./app/theme";
@@ -10,45 +10,37 @@ import { Dashboard } from "./pages/Dashboard";
 import { Devices } from "./pages/Devices";
 import { Settings } from "./pages/Settings";
 
-const TITLEBAR = 44;
-
 export function App() {
-  const [closing, setClosing] = createSignal(false);
-  let inner!: HTMLDivElement;
-  let side!: HTMLDivElement;
+  let content!: HTMLElement;
 
   createEffect(() => state.settings && applyTheme(state.settings));
+  // The window keeps one size, so every page starts at its top.
+  createEffect(on(page, () => content.scrollTo(0, 0), { defer: true }));
 
-  const close = () => {
-    if (closing()) return;
-    setClosing(true);
-    setTimeout(() => api.closeWindow(), 140);
-  };
+  const close = () => api.closeWindow();
 
   onMount(() => {
-    // Size the native window to the content (the backend clamps and keeps it above the taskbar).
-    // ResizeObserver callbacks run after layout, so no extra frame is needed.
-    let last = 0;
-    const fit = () => {
-      const h = Math.ceil(TITLEBAR + Math.max(inner?.scrollHeight ?? 0, side?.scrollHeight ?? 0) + 2);
-      if (Math.abs(h - last) > 2) {
-        last = h;
-        api.fitWindow(h);
-      }
+    // Two frames: the first lays the page out, the second follows its paint. The timer covers a
+    // WebView that pauses animation frames while its window is still cloaked.
+    let sent = false;
+    const ready = () => {
+      if (sent) return;
+      sent = true;
+      api.windowReady();
     };
-    const ro = new ResizeObserver(fit);
-    ro.observe(inner);
-    ro.observe(side);
+    const timer = setTimeout(ready, 250);
+    requestAnimationFrame(() => requestAnimationFrame(ready));
+
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
     window.addEventListener("keydown", onKey);
     onCleanup(() => {
-      ro.disconnect();
+      clearTimeout(timer);
       window.removeEventListener("keydown", onKey);
     });
   });
 
   return (
-    <div class="shell" classList={{ closing: closing() }}>
+    <div class="shell">
       <header class="titlebar" data-tauri-drag-region>
         <div class="brand" data-tauri-drag-region>
           <LogoMark size={16} />
@@ -59,8 +51,8 @@ export function App() {
         </button>
       </header>
       <div class="body">
-        <main class="content">
-          <div class="content-inner" ref={inner}>
+        <main class="content" ref={content}>
+          <div class="content-inner">
             <Show when={saveError()}>
               <div class="notice err">{saveError()}</div>
             </Show>
@@ -86,10 +78,7 @@ export function App() {
           </div>
         </main>
         <aside>
-          {/* Measured for the window height; the <aside> itself stretches to the window. */}
-          <div ref={side}>
-            <Sidebar />
-          </div>
+          <Sidebar />
         </aside>
       </div>
     </div>
